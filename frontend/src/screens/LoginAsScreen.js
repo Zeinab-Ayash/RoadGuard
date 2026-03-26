@@ -21,7 +21,7 @@ export default function MiraLogin() {
       </View>
 
       {/* Title */}
-      <Text style={styles.title}>Driver Safety Monitor</Text>
+      <Text style={styles.title}>RoadGuard</Text>
 
       {/* Subtitle */}
       <Text style={styles.subtitle}>Login As</Text>
