@@ -82,7 +82,7 @@ export default function DriverProfileScreen() {
           <View style={styles.iconCircle}>
             <Image source={driver.appLogo} style={styles.headerLogoImage} resizeMode="contain" />
           </View>
-          <Text style={styles.headerTitle}>Driver Safety Monitor</Text>
+          <Text style={styles.headerTitle}>RoadGuard</Text>
         </View>
 
         <View style={{ width: 26 }} />
