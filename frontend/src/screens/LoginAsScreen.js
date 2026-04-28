@@ -15,7 +15,7 @@ export default function MiraLogin() {
       {/* Invisible Wrapper for Position & Shadow */}
       <View style={styles.logoWrapper}>
         <Image
-          source={require("../../assets/images/logo.jpeg")}
+          source={require("../../assets/images/icon.png")}
           style={styles.logoImage}
         />
       </View>
@@ -52,16 +52,18 @@ const styles = StyleSheet.create({
 
   logoWrapper: {
     marginTop: -60,    // Pulls the image HIGHER up the screen
-    marginBottom: 40,  
+    marginBottom: 40,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 12,     // Android Shadow
-    borderRadius: 80, 
-    color:'transaprent',
+    backgroundColor: '#000042',
+    borderRadius: 20,
     width: 165,
     height: 165,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   logoImage: {

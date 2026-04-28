@@ -74,7 +74,7 @@ export default function LoginScreen() {
           <View style={styles.header}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Image
-                source={require("../assets/images/logo.png")}
+                source={require("../../assets/images/logo.png")}
                 style={styles.headerIcon}
               />
               <Text style={styles.headerText}>RoadGuard</Text>
@@ -88,7 +88,7 @@ export default function LoginScreen() {
           {/* IMAGE */}
           <View style={styles.imageContainer}>
             <Image
-              source={require("../assets/images/driver.png")}
+              source={require("../../assets/images/driver.png")}
               style={styles.image}
             />
           </View>
