@@ -111,7 +111,7 @@ export default function App() {
           <View style={styles.header}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Image
-                source={require("../assets/images/logo.png")}
+                source={require("../../assets/images/logo.png")}
                 style={styles.headerIcon}
               />
               <Text style={styles.headerText}>RoadGuard</Text>
@@ -126,7 +126,7 @@ export default function App() {
           {/* IMAGE */}
           <View style={styles.imageContainer}>
             <Image
-              source={require("../assets/images/network.png")}
+              source={require("../../assets/images/network.png")}
               style={styles.networkGraphic}
             />
           </View>
