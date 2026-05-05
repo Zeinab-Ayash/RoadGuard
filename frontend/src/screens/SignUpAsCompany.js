@@ -9,21 +9,27 @@ import {
   StatusBar,
   Platform,
   Dimensions,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { useAuth } from "../context/AuthContext";
+import api from "../services/api";
+
 
 const { height: screenHeight } = Dimensions.get("window");
 
 export default function App() {
   const navigation = useNavigation();
+  const { login } = useAuth();
 
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [phone, setPhone] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const [errors, setErrors] = useState({
     companyName: "",
@@ -90,12 +96,59 @@ export default function App() {
     return valid;
   };
 
-  const handleSignUp = () => {
-    if (validate()) {
-      alert("Signup Successful ✅");
-    }
-  };
+const handleSignUp = async () => {
+  if (!validate()) return;
 
+  try {
+    setLoading(true);
+
+    console.log("Sending signup request...");
+
+    const res = await api.post("/company/signup", {
+      company_name: companyName,
+      email,
+      password,
+      phone,
+      logo_path: null,
+    });
+
+    console.log("SUCCESS RESPONSE:", res.data);
+    
+    await login(
+      res.data.token,
+      res.data.user,
+      res.data.role
+    );
+
+    Alert.alert(
+      "Success",
+      "Signup Successful ✅"
+    );
+
+    navigation.navigate("Dashboard");
+
+  } catch (err) {
+
+    console.log("FULL ERROR:", err);
+
+    console.log(
+      "BACKEND RESPONSE:",
+      err?.response?.data
+    );
+
+    Alert.alert(
+      "Signup Failed",
+      err?.response?.data?.message ||
+      err?.response?.data?.error ||
+      "Failed to create company"
+    );
+
+  } finally {
+    setLoading(false);
+  }
+};
+
+ 
   const handleBack = () => {
     navigation.goBack();
   };
