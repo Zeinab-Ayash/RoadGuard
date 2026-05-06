@@ -21,7 +21,7 @@ const SplashScreen = () => {
 
     let nextScreen;
     if (role === 'company') nextScreen = 'Dashboard';
-    else if (role === 'driver') nextScreen = 'DriverProfile';
+    else if (role === 'driver') nextScreen = 'DriverDriving';
     else nextScreen = 'LoginAs';
 
     navigation.replace(nextScreen);
