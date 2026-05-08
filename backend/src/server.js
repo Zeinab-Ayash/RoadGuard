@@ -9,6 +9,8 @@ const authRoutes = require('./routes/authRoutes');
 const companyRoutes = require('./routes/companyRoutes');
 const driverRoutes = require('./routes/driverRoutes');
 
+const profileRoutes = require("./routes/profileRoutes");
+
 const app = express();
 
 /* ================= MIDDLEWARE ================= */
@@ -19,6 +21,8 @@ app.use(express.json());
 app.use('/auth', authRoutes);
 app.use('/company', companyRoutes);
 app.use('/driver', driverRoutes);
+
+app.use("/profile", profileRoutes);
 
 /* ================= HEALTH CHECK ================= */
 app.get('/health', (req, res) => {
@@ -34,4 +38,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`RoadGuard backend running on http://localhost:${PORT}`);
 });
+
 
