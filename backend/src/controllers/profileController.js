@@ -2,7 +2,6 @@ const supabase = require("../utils/dbConnection");
 
 const getDriverProfile = async (req, res) => {
   try {
-
     const { driverId } = req.params;
 
     // =========================
@@ -25,9 +24,7 @@ const getDriverProfile = async (req, res) => {
       .single();
 
     if (driverError || !driver) {
-      return res.status(404).json({
-        message: "Driver not found",
-      });
+      return res.status(404).json({ message: "Driver not found" });
     }
 
     // =========================
@@ -52,9 +49,7 @@ const getDriverProfile = async (req, res) => {
         )
       `)
       .eq("driver_id", driverId)
-      .order("detected_at", {
-        ascending: false,
-      });
+      .order("detected_at", { ascending: false });
 
     if (misbehaviorError) {
       console.log(misbehaviorError);
@@ -63,19 +58,16 @@ const getDriverProfile = async (req, res) => {
     // =========================
     // TODAY HISTORY
     // =========================
-    const todayHistory = allMisbehaviors?.filter((item) => {
+    const todayHistory = (allMisbehaviors || []).filter((item) => {
       return new Date(item.detected_at) >= today;
     });
 
     // =========================
     // LAST 7 DAYS HISTORY
     // =========================
-    const last7DaysHistory = allMisbehaviors?.filter((item) => {
-
+    const last7DaysHistory = (allMisbehaviors || []).filter((item) => {
       const detected = new Date(item.detected_at);
-
       return detected >= last7Days && detected < today;
-
     });
 
     // =========================
@@ -83,8 +75,7 @@ const getDriverProfile = async (req, res) => {
     // =========================
     const monthlyHistory = {};
 
-    allMisbehaviors?.forEach((item) => {
-
+    (allMisbehaviors || []).forEach((item) => {
       const date = new Date(item.detected_at);
 
       const monthName = date.toLocaleString("default", {
@@ -97,17 +88,13 @@ const getDriverProfile = async (req, res) => {
 
       monthlyHistory[monthName].push({
         id: item.misbehavior_id,
-
-        type: item.misbehavior_type.behavior_name,
-
-        severity: item.misbehavior_type.severity_score,
-
+        behavior_name: item.misbehavior_type?.behavior_name || "Unknown",
+        severity: item.misbehavior_type?.severity_score || 0,
         time: date.toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
         }),
       });
-
     });
 
     // =========================
@@ -115,10 +102,7 @@ const getDriverProfile = async (req, res) => {
     // =========================
     const { count: notificationsCount } = await supabase
       .from("notification")
-      .select("*", {
-        count: "exact",
-        head: true,
-      })
+      .select("*", { count: "exact", head: true })
       .eq("driver_id", driverId)
       .eq("is_read", false);
 
@@ -132,15 +116,12 @@ const getDriverProfile = async (req, res) => {
       .select("month, score")
       .eq("driver_id", driverId)
       .eq("year", currentYear)
-      .order("month", {
-        ascending: true,
-      });
+      .order("month", { ascending: true });
 
     // =========================
     // FINAL RESPONSE
     // =========================
     return res.json({
-
       driver: {
         driver_id: driver.driver_id,
         driver_name: driver.driver_name,
@@ -154,34 +135,25 @@ const getDriverProfile = async (req, res) => {
       notificationsCount: notificationsCount || 0,
 
       history: {
+        today: todayHistory.map((item) => ({
+          id: item.misbehavior_id,
+          behavior_name: item.misbehavior_type?.behavior_name || "Unknown",
+          severity: item.misbehavior_type?.severity_score || 0,
+          time: new Date(item.detected_at).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        })),
 
-        today:
-          todayHistory?.map((item) => ({
-            id: item.misbehavior_id,
-
-            type: item.misbehavior_type.behavior_name,
-
-            severity: item.misbehavior_type.severity_score,
-
-            time: new Date(item.detected_at).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-          })) || [],
-
-        last7Days:
-          last7DaysHistory?.map((item) => ({
-            id: item.misbehavior_id,
-
-            type: item.misbehavior_type.behavior_name,
-
-            severity: item.misbehavior_type.severity_score,
-
-            time: new Date(item.detected_at).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-          })) || [],
+        last7Days: last7DaysHistory.map((item) => ({
+          id: item.misbehavior_id,
+          behavior_name: item.misbehavior_type?.behavior_name || "Unknown",
+          severity: item.misbehavior_type?.severity_score || 0,
+          time: new Date(item.detected_at).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        })),
 
         monthlyHistory,
       },
@@ -192,14 +164,9 @@ const getDriverProfile = async (req, res) => {
           score: m.score,
         })) || [],
     });
-
   } catch (err) {
-
     console.error(err);
-
-    return res.status(500).json({
-      message: "Server error",
-    });
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
