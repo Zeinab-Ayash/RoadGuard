@@ -411,43 +411,47 @@ const handleLogout = async () => {
       </ScrollView>
 
       {/* BOTTOM NAV */}
-      <View style={styles.bottomNav}>
+<View style={styles.bottomNav}>
 
-        <View style={styles.navItem}>
-          <Ionicons name="person" size={26} color="#F97316" />
+  {/* PROFILE */}
+  <TouchableOpacity
+    style={styles.navItem}
+    onPress={() => navigation.navigate("DriverDriving")}
+  >
+    <Ionicons name="person" size={26} color="#F97316" />
 
-          <Text style={[styles.navText, { color: '#F97316' }]}>
-            Profile
+    <Text style={[styles.navText, { color: '#F97316' }]}>
+      Profile
+    </Text>
+  </TouchableOpacity>
+
+  {/* NOTIFICATIONS */}
+  <TouchableOpacity
+    style={styles.navItem}
+    onPress={() => navigation.navigate("Notifications")}
+  >
+    <View>
+      <Ionicons
+        name="notifications"
+        size={26}
+        color="#1E3A5F"
+      />
+
+      {driver.notificationsCount > 0 && (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>
+            {driver.notificationsCount}
           </Text>
         </View>
+      )}
+    </View>
 
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => navigation.navigate("Notifications")}
-        >
-          <View>
-            <Ionicons
-              name="notifications"
-              size={26}
-              color="#1E3A5F"
-            />
+    <Text style={styles.navText}>
+      Notifications
+    </Text>
+  </TouchableOpacity>
 
-            {driver.notificationsCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>
-                  {driver.notificationsCount}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          <Text style={styles.navText}>
-            Notifications
-          </Text>
-        </TouchableOpacity>
-
-      </View>
-
+</View>
     </SafeAreaView>
   );
 }
