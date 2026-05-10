@@ -20,14 +20,14 @@ export default function DriverProfileScreen() {
     const fetchDriverProfile = async () => {
       try {
         const response = await fetch(
-          "http://localhost:3000/profile/driver/4e564faf-bb6f-43d5-856c-e5c57b091eb8"
+          "http://192.168.1.14:3000/profile/driver/4e564faf-bb6f-43d5-856c-e5c57b091eb8"
         );
         const data = await response.json();
 
         setDriver({
           name: data.driver.driver_name,
           company: data.driver.company_name,
-          id: data.driver.driver_code,
+          id: data.driver.driver_id,
            photo: data.driver.profile_image || null,
           appLogo: data.driver.app_logo
             ? { uri: data.driver.app_logo }
@@ -82,6 +82,59 @@ export default function DriverProfileScreen() {
       }
     };
   
+ const handleDeactivate = () => {
+  Alert.alert(
+    "Deactivate Driver",
+    "Are you sure you want to deactivate this driver?",
+    [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Yes",
+        style: "destructive",
+        onPress: confirmDeactivate,
+      },
+    ]
+  );
+};
+
+const confirmDeactivate = async () => {
+  try {
+    const response = await fetch(
+      `http://192.168.1.14:3000/driver/${driver.id}/deactivate`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const text = await response.text(); // SAFE PARSE FIRST
+    console.log("RAW RESPONSE:", text);
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      data = { message: text };
+    }
+
+    if (response.ok) {
+      Alert.alert("Success", "Driver deactivated");
+      navigation.goBack();
+    } else {
+      Alert.alert("Failed", data?.message || "Something went wrong");
+    }
+
+  } catch (err) {
+    console.log("ERROR:", err);
+    Alert.alert("Error", "Network request failed");
+  }
+};
+
 
   const getScoreColor = (score) => {
     if (score >= 80) return '#22C55E';
@@ -107,50 +160,7 @@ export default function DriverProfileScreen() {
       </View>
     );
   }
- const handleDeactivate = () => {
-  Alert.alert(
-    "Deactivate Driver",
-    "Are you sure you want to deactivate this profile?",
-    [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Yes, Deactivate",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            const token = "YOUR_COMPANY_TOKEN_HERE"; // 🔥 IMPORTANT
 
-            const response = await fetch(
-              `http://192.168.1.3:3000/drivers/${driver.id}/deactivate`,
-              {
-                method: "PATCH",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`, // ✅ REQUIRED
-                },
-              }
-            );
-
-            const data = await response.json();
-
-            console.log("Deactivate response:", data); // 🔍 DEBUG
-
-            if (response.ok) {
-              Alert.alert("Success", "Driver deactivated successfully");
-              navigation.goBack();
-            } else {
-              Alert.alert("Error", data.message || "Failed to deactivate driver");
-            }
-
-          } catch (err) {
-            console.log("ERROR:", err);
-            Alert.alert("Error", "Server error");
-          }
-        },
-      },
-    ]
-  );
-};
   return (
     <SafeAreaView style={styles.container}>
 
