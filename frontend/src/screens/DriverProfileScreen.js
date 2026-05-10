@@ -102,20 +102,25 @@ export default function DriverProfileScreen() {
 
 const confirmDeactivate = async () => {
   try {
+    const token = authToken; // your JWT token
+    const driver_id = driver.id;
+
     const response = await fetch(
-      `http://192.168.1.14:3000/driver/${driver.id}/deactivate`,
+      `http://192.168.1.14:3000/driver/deactivate/${driver_id}`,
       {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
       }
     );
 
-    const text = await response.text(); // SAFE PARSE FIRST
+    const text = await response.text();
     console.log("RAW RESPONSE:", text);
 
     let data;
+
     try {
       data = JSON.parse(text);
     } catch (e) {
@@ -123,10 +128,17 @@ const confirmDeactivate = async () => {
     }
 
     if (response.ok) {
-      Alert.alert("Success", "Driver deactivated");
+      Alert.alert(
+  "Success",
+  `Driver ${driver_id} deactivated`
+);
+
       navigation.goBack();
     } else {
-      Alert.alert("Failed", data?.message || "Something went wrong");
+      Alert.alert(
+        "Failed",
+        data?.message || "Something went wrong"
+      );
     }
 
   } catch (err) {
