@@ -15,7 +15,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from "../context/AuthContext";
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { Alert } from 'react-native';
 
 export default function DriverDrivingScreen() {
   const navigation = useNavigation();
