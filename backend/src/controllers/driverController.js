@@ -162,6 +162,11 @@ const loginDriver = async (req, res) => {
 // ==============================
 
 const deactivateDriver = async (req, res) => {
+  console.log("🔥 HIT DEACTIVATE");
+  console.log("USER:", req.user);
+console.log("ROLE:", req.user?.role);
+  console.log("PARAMS:", req.params);
+
   try {
     const driverId = req.params.id;
     const companyId = req.user.id;
@@ -171,6 +176,7 @@ const deactivateDriver = async (req, res) => {
       return res.status(403).json({ message: "Not authorized" });
     }
 
+    // check ownership
     const { data: driverCheck, error: checkError } = await supabase
       .from("driver")
       .select("company_id")
@@ -185,9 +191,10 @@ const deactivateDriver = async (req, res) => {
       return res.status(403).json({ message: "You do not own this driver" });
     }
 
+    // ✅ FIX: use STATUS (NOT is_active)
     const { data, error } = await supabase
       .from("driver")
-      .update({ status: "inactive" }) // ✅ FIXED
+      .update({ status: "inactive" })
       .eq("driver_id", driverId)
       .select("driver_id, status")
       .single();
