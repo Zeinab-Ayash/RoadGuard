@@ -11,6 +11,8 @@ import {
   Alert
 } from 'react-native';
 
+import * as ImagePicker from 'expo-image-picker';
+
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
@@ -36,9 +38,7 @@ export default function DriverDrivingScreen() {
           company: data.driver.company_name,
           id: data.driver.driver_code,
 
-          photo: data.driver.profile_image
-            ? { uri: data.driver.profile_image }
-            : null,
+          photo: data.driver.profile_image || null,
 
           safetyScore: data.driver.current_score,
 
@@ -59,6 +59,39 @@ export default function DriverDrivingScreen() {
 
     fetchDriverProfile();
   }, []);
+
+  const pickImage = async () => {
+    try {
+      const permissionResult =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permissionResult.granted) {
+        Alert.alert(
+          "Permission needed",
+          "Please allow access to your photos"
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 1,
+      });
+
+      if (!result.canceled) {
+        setDriver((prev) => ({
+          ...prev,
+          photo: result.assets[0].uri,
+        }));
+      }
+
+    } catch (error) {
+      console.log(error);
+      Alert.alert("Error", "Could not open gallery");
+    }
+  };
 
   const getScoreColor = (score) => {
     if (score >= 80) return '#22C55E';
@@ -120,20 +153,32 @@ export default function DriverDrivingScreen() {
         <View style={styles.profileCard}>
 
           <View style={styles.avatarContainer}>
-            <View style={styles.avatarFallback}>
-              <Text style={styles.avatarLetters}>
-                {driver.name
-                  .split(' ')
-                  .map(n => n[0])
-                  .join('')
-                  .slice(0, 2)
-                  .toUpperCase()}
-              </Text>
-            </View>
 
-            <TouchableOpacity style={styles.cameraIcon}>
+            {driver.photo ? (
+              <Image
+                source={{ uri: driver.photo }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <View style={styles.avatarFallback}>
+                <Text style={styles.avatarLetters}>
+                  {driver.name
+                    .split(' ')
+                    .map(n => n[0])
+                    .join('')
+                    .slice(0, 2)
+                    .toUpperCase()}
+                </Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={styles.cameraIcon}
+              onPress={pickImage}
+            >
               <Ionicons name="camera" size={16} color="white" />
             </TouchableOpacity>
+
           </View>
 
           <View style={styles.driverInfo}>
@@ -452,6 +497,12 @@ const styles = StyleSheet.create({
 
   avatarContainer: {
     position: 'relative'
+  },
+
+  avatarImage: {
+    width: 75,
+    height: 75,
+    borderRadius: 38,
   },
 
   avatarFallback: {
