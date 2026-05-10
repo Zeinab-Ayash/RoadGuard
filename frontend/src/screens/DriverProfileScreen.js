@@ -19,7 +19,7 @@ export default function DriverProfileScreen() {
     const fetchDriverProfile = async () => {
       try {
         const response = await fetch(
-          "http://192.168.1.3:3000/profile/driver/4e564faf-bb6f-43d5-856c-e5c57b091eb8"
+          "http://localhost:3000/profile/driver/4e564faf-bb6f-43d5-856c-e5c57b091eb8"
         );
         const data = await response.json();
 

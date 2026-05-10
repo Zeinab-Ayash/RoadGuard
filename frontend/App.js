@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import DriverProfileScreen from './src/screens/DriverProfileScreen';
+import DriverDrivingScreen from './src/screens/DriverDrivingScreen';
 import Notifications from './src/screens/Notifications'; // 👈 add this
 
 const Stack = createNativeStackNavigator();
@@ -13,8 +13,8 @@ export default function App() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         
         <Stack.Screen 
-          name="DriverProfile" 
-          component={DriverProfileScreen} 
+          name="DriverDriving" 
+          component={DriverDrivingScreen} 
         />
 
         {/* 👇 THIS IS REQUIRED */}
