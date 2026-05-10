@@ -8,8 +8,13 @@ const {
   deactivateDriver
 } = require('../controllers/driverController');
 
+
 router.post('/add', requireAuth, addDriver);
 router.post('/login', loginDriver);
-router.patch('/:id/deactivate', requireAuth, deactivateDriver);
+router.patch(
+  "/driver/deactivate/:id",
+  requireAuth,
+  deactivateDriver
+);
 
 module.exports = router;

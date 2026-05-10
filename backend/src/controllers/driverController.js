@@ -162,24 +162,24 @@ const loginDriver = async (req, res) => {
 // ==============================
 
 const deactivateDriver = async (req, res) => {
-  console.log("🔥 HIT DEACTIVATE");
+  console.log("🔥 HIT DEACTIVATE DRIVER");
   console.log("USER:", req.user);
-console.log("ROLE:", req.user?.role);
   console.log("PARAMS:", req.params);
 
   try {
-    const driverId = req.params.id;
-    const companyId = req.user.id;
+    const driverId = req.params.id; // driver_id from URL
+    const companyId = req.user.id;   // company_id from token
     const role = req.user.role;
 
+    // ✅ Only companies can deactivate
     if (role !== "company") {
       return res.status(403).json({ message: "Not authorized" });
     }
 
-    // check ownership
+    // ✅ Check if driver exists and belongs to this company
     const { data: driverCheck, error: checkError } = await supabase
       .from("driver")
-      .select("company_id")
+      .select("company_id, status, driver_name")
       .eq("driver_id", driverId)
       .single();
 
@@ -191,25 +191,26 @@ console.log("ROLE:", req.user?.role);
       return res.status(403).json({ message: "You do not own this driver" });
     }
 
-    // ✅ FIX: use STATUS (NOT is_active)
+    // ✅ Update the driver status to inactive
     const { data, error } = await supabase
       .from("driver")
       .update({ status: "inactive" })
       .eq("driver_id", driverId)
-      .select("driver_id, status")
+      .select("driver_id, driver_name, status")
       .single();
 
     if (error) {
+      console.error("Supabase update error:", error);
       return res.status(400).json({ message: error.message });
     }
 
     return res.json({
-      message: "Driver deactivated successfully",
+      message: `Driver "${data.driver_name}" has been deactivated successfully`,
       driver: data,
     });
 
   } catch (err) {
-    console.error(err);
+    console.error("Server error:", err);
     return res.status(500).json({ message: "Server error" });
   }
 };
