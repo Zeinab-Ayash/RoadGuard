@@ -108,8 +108,6 @@ export default function DriverProfileScreen() {
     );
   }
  const handleDeactivate = () => {
-  console.log("Deactivate pressed"); // 👈 DEBUG (important)
-
   Alert.alert(
     "Deactivate Driver",
     "Are you sure you want to deactivate this profile?",
@@ -120,27 +118,33 @@ export default function DriverProfileScreen() {
         style: "destructive",
         onPress: async () => {
           try {
+            const token = "YOUR_COMPANY_TOKEN_HERE"; // 🔥 IMPORTANT
+
             const response = await fetch(
-              `http://192.168.1.3:3000/driver/deactivate/${driver.id}`,
+              `http://192.168.1.3:3000/drivers/${driver.id}/deactivate`,
               {
-                method: "PUT",
+                method: "PATCH",
                 headers: {
                   "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`, // ✅ REQUIRED
                 },
               }
             );
 
             const data = await response.json();
 
+            console.log("Deactivate response:", data); // 🔍 DEBUG
+
             if (response.ok) {
-              Alert.alert("Success", "Driver has been deactivated.");
+              Alert.alert("Success", "Driver deactivated successfully");
               navigation.goBack();
             } else {
-              Alert.alert("Error", data.message || "Failed to deactivate driver.");
+              Alert.alert("Error", data.message || "Failed to deactivate driver");
             }
+
           } catch (err) {
-            console.error(err);
-            Alert.alert("Error", "Server error.");
+            console.log("ERROR:", err);
+            Alert.alert("Error", "Server error");
           }
         },
       },
@@ -320,11 +324,7 @@ export default function DriverProfileScreen() {
        <View style={{ paddingBottom: 40 }}>
   <TouchableOpacity
     style={styles.logoutBtn}
-    onPress={() => {
-      console.log("Button clicked"); // 👈 DEBUG
-      handleDeactivate();
-    }}
-  >
+    onPress={handleDeactivate}>
     <Text style={styles.logoutText}>Deactivate Driver</Text>
   </TouchableOpacity>
 </View>

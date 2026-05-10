@@ -12,13 +12,14 @@ import {
 } from 'react-native';
 
 import * as ImagePicker from 'expo-image-picker';
-
+import { useAuth } from "../context/AuthContext";
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { Alert } from 'react-native';
 
 export default function DriverDrivingScreen() {
   const navigation = useNavigation();
-
+  const { logout } = useAuth();
   const [driver, setDriver] = useState(null);
   const [loading, setLoading] = useState(true);
   const [openSection, setOpenSection] = useState('Today');
@@ -123,7 +124,15 @@ export default function DriverDrivingScreen() {
       </View>
     );
   }
-
+const handleLogout = async () => {
+  try {
+    await logout(); // clears token/session
+    navigation.replace('LoginAsDriver');
+  } catch (err) {
+    console.log("Logout error:", err);
+    Alert.alert("Error", "Logout failed");
+  }
+};
   return (
     <SafeAreaView style={styles.container}>
 
@@ -366,12 +375,9 @@ export default function DriverDrivingScreen() {
         </View>
 
         {/* LOGOUT */}
-        <TouchableOpacity style={styles.logoutBtn}>
-          <Text style={styles.logoutText}>
-            Logout
-          </Text>
-        </TouchableOpacity>
-
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+  <Text style={styles.logoutText}>Logout</Text>
+</TouchableOpacity>
         {/* MODAL */}
         {selectedMisbehavior && (
           <View style={styles.modalOverlay}>
