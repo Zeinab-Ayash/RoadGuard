@@ -340,7 +340,7 @@ export default function DriverProfileScreen() {
 
         <TouchableOpacity
           style={styles.navItem}
-          onPress={() => navigation.navigate("Notifications")}
+          onPress={() => navigation.navigate("Notifications", { from: "DriverProfile" })}
         >
           <View>
             <Ionicons name="notifications" size={26} color="#1E3A5F" />

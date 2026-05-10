@@ -428,7 +428,7 @@ const handleLogout = async () => {
   {/* NOTIFICATIONS */}
   <TouchableOpacity
     style={styles.navItem}
-    onPress={() => navigation.navigate("Notifications")}
+    onPress={() => navigation.navigate("Notifications", { from: "DriverDriving" })}
   >
     <View>
       <Ionicons

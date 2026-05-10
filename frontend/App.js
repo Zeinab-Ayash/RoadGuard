@@ -17,8 +17,8 @@ export default function App() {
         <Stack.Navigator screenOptions={{ headerShown: false }}>
 
           <Stack.Screen 
-            name="DriverDriving" 
-            component={DriverDrivingScreen} 
+            name="DriverProfile" 
+            component={DriverProfileScreen} 
           />
 
           <Stack.Screen 
