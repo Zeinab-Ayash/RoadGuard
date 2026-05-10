@@ -21,8 +21,13 @@ create table driver (
   password text not null,
   profile_image text,
   current_score integer default 100,
+  status text not null default 'active' check (status in ('active', 'inactive')),
   created_at timestamp default now()
 );
+-- Note: driver.status is the soft-delete flag. The Deactivate button on
+-- DriverProfileScreen sets it to 'inactive' instead of DELETE-ing the row,
+-- which preserves history. The /drivers list endpoint should filter by
+-- status='active'. Login should also check status='active'.
 -- Note: driver.current_score is a denormalized cache of the current
 -- monthly_score row. Duplication is intentional (read performance).
 

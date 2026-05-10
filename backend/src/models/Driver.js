@@ -15,6 +15,7 @@ async function findByCompany(companyId) {
     .from('driver')
     .select(SAFE_DRIVER_FIELDS)
     .eq('company_id', companyId)
+    .eq('status', 'active')
     .order('created_at', { ascending: false });
 
   if (driversError) throw driversError;
