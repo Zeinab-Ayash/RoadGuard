@@ -154,26 +154,46 @@ const loginDriver = async (req, res) => {
 };
 
 
+
+
+
 // ==============================
 // 🚫 DEACTIVATE DRIVER (NEW)
 // ==============================
+
 const deactivateDriver = async (req, res) => {
   try {
-    const { id } = req.params;
+    const driverId = req.params.id;
+    const companyId = req.user.id;
+    const role = req.user.role;
+
+    if (role !== "company") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    const { data: driverCheck, error: checkError } = await supabase
+      .from("driver")
+      .select("company_id")
+      .eq("driver_id", driverId)
+      .single();
+
+    if (checkError || !driverCheck) {
+      return res.status(404).json({ message: "Driver not found" });
+    }
+
+    if (driverCheck.company_id !== companyId) {
+      return res.status(403).json({ message: "You do not own this driver" });
+    }
 
     const { data, error } = await supabase
       .from("driver")
-      .update({
-        is_active: false
-      })
-      .eq("driver_id", id)
-      .select()
+      .update({ status: "inactive" }) // ✅ FIXED
+      .eq("driver_id", driverId)
+      .select("driver_id, status")
       .single();
 
     if (error) {
-      return res.status(400).json({
-        message: error.message,
-      });
+      return res.status(400).json({ message: error.message });
     }
 
     return res.json({
@@ -183,13 +203,9 @@ const deactivateDriver = async (req, res) => {
 
   } catch (err) {
     console.error(err);
-    return res.status(500).json({
-      message: "Server error",
-    });
+    return res.status(500).json({ message: "Server error" });
   }
 };
-
-
 // ==============================
 // EXPORTS
 // ==============================

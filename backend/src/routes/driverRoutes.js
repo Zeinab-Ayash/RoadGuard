@@ -10,6 +10,6 @@ const {
 
 router.post('/add', requireAuth, addDriver);
 router.post('/login', loginDriver);
-router.put('/deactivate/:id', requireAuth, deactivateDriver);
+router.patch('/:id/deactivate', requireAuth, deactivateDriver);
 
 module.exports = router;
