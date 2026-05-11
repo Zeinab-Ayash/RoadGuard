@@ -127,6 +127,13 @@ const loginDriver = async (req, res) => {
       });
     }
 
+    // ✅ CHECK DRIVER STATUS
+   if (driver.status?.toLowerCase() !== "active") {
+     return res.status(403).json({
+       message: "Driver account is inactive",
+  });
+}
+
     const token = signToken({
       id: driver.driver_id,
       role: "driver",
