@@ -10,19 +10,24 @@ import {
   StatusBar,
   Platform,
   ScrollView,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
+import api from "../services/api";
+
 const { height: screenHeight } = Dimensions.get("window");
 
 export default function AddDriverScreen({ navigation, onBack }) {
+  
+
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
 
-  // ✅ selectable country code
-  const [countryCode, setCountryCode] = useState("+974");
-  const [showCodes, setShowCodes] = useState(false);
+  
+  const [generatedDriverCode, setGeneratedDriverCode] = useState("");
+  const [generatedPassword, setGeneratedPassword] = useState("");
 
   const [errors, setErrors] = useState({
     name: "",
@@ -56,19 +61,56 @@ export default function AddDriverScreen({ navigation, onBack }) {
     setErrors(newErrors);
     return valid;
   };
+  
+ 
+const handleAddDriver = async () => {
+    if (!validate()) return;
 
-  const handleAddDriver = () => {
-    if (validate()) {
-      setShowSuccess(true);
-    }
-  };
+    try {
+       console.log("Sending request...");
 
+       const res = await api.post("/driver/add", {
+        driver_name: name,
+        phone: phone,
+      });
+      console.log("RESPONSE:", res.data);
+      const driver = res.data.driver;
+      if (!driver) {
+        Alert.alert("Error", "Invalid backend response");
+        return;
+      }
+      
+      setGeneratedDriverCode(driver.driver_code);
+      setGeneratedPassword(driver.password);
+       setShowSuccess(true);
+      setName("");
+      setPhone("");
+
+      
+
+      
+    
+      
+  } catch (err) {
+  console.log("FULL ERROR:", err);
+  console.log("BACKEND ERROR:", err.response?.data);
+
+  Alert.alert(
+    "Error",
+    JSON.stringify(err.response?.data) || "Failed to add driver"
+  );
+}
+  
+};
+      
+
+  
   const handleBack = () => {
     if (onBack) onBack();
     else if (navigation) navigation.goBack();
   };
 
-  const countryOptions = ["+974", "+961", "+1", "+44", "+33"];
+  
 
   return (
     <View style={styles.outerContainer}>
@@ -81,7 +123,7 @@ export default function AddDriverScreen({ navigation, onBack }) {
           <View style={styles.header}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Image
-                source={require("../assets/images/logo.png")}
+                source={require("../../assets/images/logo.png")}
                 style={styles.headerIcon}
               />
               <Text style={styles.headerText}>RoadGuard</Text>
@@ -96,7 +138,7 @@ export default function AddDriverScreen({ navigation, onBack }) {
           {/* IMAGE */}
           <View style={styles.imageContainer}>
             <Image
-              source={require("../assets/images/AddDriver.png")}
+              source={require("../../assets/images/AddDriver.png")}
               style={styles.image}
             />
           </View>
@@ -119,49 +161,19 @@ export default function AddDriverScreen({ navigation, onBack }) {
                 style={styles.input}
               />
               {errors.name ? <Text style={styles.error}>{errors.name}</Text> : null}
-
-              {/* COUNTRY CODE SELECTOR */}
-              <View style={{ marginTop: 10 }}>
-                <TouchableOpacity
-                  style={styles.phoneContainer}
-                  onPress={() => setShowCodes(!showCodes)}
-                >
-                  <Text style={{ marginRight: 10 }}>{countryCode}</Text>
-
-                  <TextInput
-                    placeholder="phone number"
-                    placeholderTextColor="#aaa"
-                    keyboardType="numeric"
-                    value={phone}
-                    onChangeText={(text) => {
+              
+              <TextInput
+                     placeholder="Phone Number"
+                     placeholderTextColor="#aaa"
+                     keyboardType="numeric"
+                     value={phone}
+                     onChangeText={(text) => {
                       setPhone(text);
                       setErrors({ ...errors, phone: "" });
                     }}
-                    style={styles.phoneInput}
-                  />
-
-                  <Ionicons name="chevron-down" size={18} color="#777" />
-                </TouchableOpacity>
-
-                {/* DROPDOWN */}
-                {showCodes && (
-                  <View style={styles.dropdown}>
-                    {countryOptions.map((code) => (
-                      <TouchableOpacity
-                        key={code}
-                        onPress={() => {
-                          setCountryCode(code);
-                          setShowCodes(false);
-                        }}
-                        style={styles.dropdownItem}
-                      >
-                        <Text>{code}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </View>
-
+              style={[styles.input, { marginTop: 10 }]}
+             />
+              
               {errors.phone ? (
                 <Text style={styles.error}>{errors.phone}</Text>
               ) : null}
@@ -180,13 +192,14 @@ export default function AddDriverScreen({ navigation, onBack }) {
                   </Text>
 
                   <View style={styles.credentialRow}>
-                    <Text style={styles.label}>Driver ID</Text>
-                    <Text style={styles.value}>DRV19002</Text>
+                    <Text style={styles.label}>Driver code</Text>
+                     <Text style={styles.value}>{generatedDriverCode}</Text>
                   </View>
 
                   <View style={styles.credentialRow}>
                     <Text style={styles.label}>Password</Text>
-                    <Text style={styles.value}>4Tm8d!4x</Text>
+                    <Text style={styles.value}>{generatedPassword} </Text>
+                                     
                   </View>
 
                   <Text style={styles.note}>
@@ -194,8 +207,12 @@ export default function AddDriverScreen({ navigation, onBack }) {
                   </Text>
 
                   <TouchableOpacity
-                    style={styles.okButton}
-                    onPress={() => setShowSuccess(false)}
+                      style={styles.okButton}
+                      onPress={() => {
+                        setShowSuccess(false); 
+                       navigation.navigate("Dashboard");
+                      
+                  }}
                   >
                     <Text style={styles.okText}>OK</Text>
                   </TouchableOpacity>
@@ -289,31 +306,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
 
-  phoneContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f5f5f5",
-    borderRadius: 10,
-    padding: 10,
-    marginTop: 10,
-  },
-
-  phoneInput: {
-    flex: 1,
-  },
-
-  dropdown: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    marginTop: 5,
-    padding: 10,
-    elevation: 3,
-  },
-
-  dropdownItem: {
-    padding: 10,
-  },
-
+  
   button: {
     backgroundColor: "#FF6A00",
     padding: 15,

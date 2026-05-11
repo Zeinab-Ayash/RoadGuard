@@ -10,21 +10,22 @@ import {
   StatusBar,
   Platform,
   ScrollView,
-} from "react-native";
+  } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import api from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
 const { height: screenHeight } = Dimensions.get("window");
 
 export default function LoginScreen() {
   const navigation = useNavigation();
+  const { login } = useAuth();
 
   const [driverId, setDriverId] = useState("");
   const [password, setPassword] = useState("");
   const [secure, setSecure] = useState(true);
-  const [successMessage, setSuccessMessage] = useState("");
-
   const [errors, setErrors] = useState({
     driverId: "",
     password: "",
@@ -35,7 +36,7 @@ export default function LoginScreen() {
     let newErrors = { driverId: "", password: "" };
 
     if (!driverId.trim()) {
-      newErrors.driverId = "Driver ID is required";
+      newErrors.driverId = "Driver code is required";
       valid = false;
     }
 
@@ -51,14 +52,24 @@ export default function LoginScreen() {
     return valid;
   };
 
-  const handleLogin = () => {
-    if (validate()) {
-      setSuccessMessage("Login successful 🎉");
-    } else {
-      setSuccessMessage("");
-    }
-  };
+const handleLogin = async () => {
+    if (!validate()) return;
+    try {
+    const res = await api.post("/driver/login", {
+      driver_code: driverId,
+      password,
+    });
 
+    await login(res.data.token, res.data.user, res.data.role);
+
+    navigation.navigate("DriverProfile");
+  } catch (err) {
+    alert(err.response?.data?.message || "Login failed");
+  }
+};
+
+    
+  
   const handleBack = () => {
     navigation.goBack();
   };
@@ -74,7 +85,7 @@ export default function LoginScreen() {
           <View style={styles.header}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Image
-                source={require("../assets/images/logo.png")}
+                source={require("../../assets/images/logo.png")}
                 style={styles.headerIcon}
               />
               <Text style={styles.headerText}>RoadGuard</Text>
@@ -88,7 +99,7 @@ export default function LoginScreen() {
           {/* IMAGE */}
           <View style={styles.imageContainer}>
             <Image
-              source={require("../assets/images/driver.png")}
+              source={require("../../assets/images/driver.png")}
               style={styles.image}
             />
           </View>
@@ -101,11 +112,11 @@ export default function LoginScreen() {
                 Please enter your credentials
               </Text>
 
-              {/* DRIVER ID */}
+              {/* DRIVER Code */}
               <View style={styles.inputContainer}>
                 <Ionicons name="person-outline" size={20} color="#888" />
                 <TextInput
-                  placeholder="Driver ID"
+                  placeholder="Driver code"
                   placeholderTextColor="#aaa"
                   value={driverId}
                   onChangeText={(text) => {
@@ -145,14 +156,7 @@ export default function LoginScreen() {
                 <Text style={styles.error}>{errors.password}</Text>
               ) : null}
 
-              {/* SUCCESS */}
-              {successMessage ? (
-                <View style={styles.successCard}>
-                  <Ionicons name="checkmark-circle" size={50} color="green" />
-                  <Text style={styles.successText}>{successMessage}</Text>
-                </View>
-              ) : null}
-
+              
               {/* BUTTON */}
               <TouchableOpacity style={styles.button} onPress={handleLogin}>
                 <Text style={styles.buttonText}>Log In</Text>
@@ -265,19 +269,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
-  successCard: {
-    width: "100%",
-    padding: 20,
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    alignItems: "center",
-    elevation: 5,
-    marginTop: 10,
-  },
-
-  successText: {
-    fontSize: 16,
-    marginVertical: 10,
-    fontWeight: "600",
-  },
+  
 });

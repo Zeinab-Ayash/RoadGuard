@@ -10,15 +10,18 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from "react-native";
+  } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import api from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
 const { height: screenHeight } = Dimensions.get("window");
 
 export default function App() {
   const navigation = useNavigation();
+  const { login } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -60,12 +63,24 @@ export default function App() {
     return valid;
   };
 
-  const handleLogin = () => {
-    if (validate()) {
-      alert("Company Login Successful 🏢");
-    }
-  };
+ const handleLogin = async () => {
+    if (!validate()) return;
+    try {
+    const res = await api.post("/company/login", {
+      email,
+      password,
+    });
+    console.log("LOGIN RESPONSE:", res.data);
+    await login(res.data.token, res.data.user, res.data.role);
 
+    navigation.navigate("Dashboard");
+  } catch (err) {
+    alert(err.response?.data?.message || "Login failed");
+  }
+};
+
+
+  
   const handleBack = () => {
     navigation.goBack();
   };
@@ -81,7 +96,7 @@ export default function App() {
           <View style={styles.header}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Image
-                source={require("../assets/images/logo.png")}
+                source={require("../../assets/images/logo.png")}
                 style={styles.headerIcon}
               />
               <Text style={styles.headerText}>RoadGuard</Text>
@@ -96,7 +111,7 @@ export default function App() {
           {/* IMAGE */}
           <View style={styles.imageContainer}>
             <Image
-              source={require("../assets/images/network.png")}
+              source={require("../../assets/images/network.png")}
               style={styles.networkGraphic}
             />
           </View>
@@ -156,7 +171,8 @@ export default function App() {
               {/* SIGN UP */}
               <View style={styles.signupContainer}>
                 <Text style={styles.signupText}>Don’t have an account? </Text>
-                <TouchableOpacity>
+                <TouchableOpacity onPress={() =>navigation.navigate("SignUpAsCompany")}>
+  
                   <Text style={styles.signupLink}>Sign Up</Text>
                 </TouchableOpacity>
               </View>

@@ -10,7 +10,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import iconImage from '../../assets/images/icon.png';
-
+import { useNavigation } from '@react-navigation/native';
+import { useRoute } from '@react-navigation/native';
 /* =========================
    DUMMY DATA
 ========================= */
@@ -45,6 +46,10 @@ const initialNotifications = [
    COMPONENT
 ========================= */
 export default function Notifications() {
+   const route = useRoute();
+const navigation = useNavigation();
+
+const fromScreen = route.params?.from || "DriverDriving";
   const [notifications, setNotifications] = useState(initialNotifications);
 
   const soundRef = useRef(null);
@@ -147,15 +152,18 @@ export default function Notifications() {
 
       {/* FOOTER */}
       <View style={styles.footer}>
+        <TouchableOpacity
+  style={styles.navItem}
+  onPress={() => navigation.navigate(fromScreen)}
+>
+  <Ionicons name="person" size={22} color="#555" />
+  <Text style={styles.inactiveTab}>Profile</Text>
+</TouchableOpacity>
         <TouchableOpacity style={styles.navItem}>
           <Ionicons name="notifications" size={22} color="#f97316" />
           <Text style={styles.activeTab}>Notifications</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="person" size={22} color="#555" />
-          <Text style={styles.inactiveTab}>Profile</Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
