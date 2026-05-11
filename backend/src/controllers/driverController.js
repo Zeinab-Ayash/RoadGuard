@@ -15,7 +15,7 @@ const generateDriverCode = () => {
 
 
 // ==============================
-// ➕ ADD DRIVER 
+// ➕ ADD DRIVER
 // ==============================
 const addDriver = async (req, res) => {
   try {
@@ -35,7 +35,7 @@ const addDriver = async (req, res) => {
       const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
       const { data, error } = await supabase
-        .from("driver") // ✅ make sure table name is correct
+        .from("driver")
         .insert([
           {
             company_id: companyId,
@@ -45,12 +45,12 @@ const addDriver = async (req, res) => {
             password: hashedPassword,
             profile_image: null,
             current_score: 100,
+            is_active: true, // ✅ important
           },
         ])
         .select()
         .single();
 
-      // ✅ SUCCESS
       if (!error && data) {
         return res.status(201).json({
           message: "Driver created successfully",
@@ -59,12 +59,11 @@ const addDriver = async (req, res) => {
             driver_name: data.driver_name,
             phone: data.phone,
             driver_code: data.driver_code,
-            password: plainPassword, // show once only
+            password: plainPassword,
           },
         });
       }
 
-      // retry only for duplicate driver_code
       if (error && error.code !== "23505") {
         console.error(error);
         return res.status(400).json({
@@ -76,6 +75,7 @@ const addDriver = async (req, res) => {
     return res.status(500).json({
       message: "Failed to generate unique driver code",
     });
+
   } catch (err) {
     console.error(err);
     return res.status(500).json({
@@ -97,20 +97,14 @@ const loginDriver = async (req, res) => {
         message: "driver_code and password are required",
       });
     }
+
     const cleanCode = driver_code.trim().toUpperCase();
 
-    console.log("Entered Code:", cleanCode);
-
-
     const { data: driver, error } = await supabase
-      .from("driver") // ✅ consistent table name
+      .from("driver")
       .select("*")
       .eq("driver_code", cleanCode)
       .single();
-
-    console.log("Driver Found:", driver);
-    console.log("Supabase Error:", error);
-
 
     if (error || !driver) {
       return res.status(401).json({
@@ -118,8 +112,12 @@ const loginDriver = async (req, res) => {
       });
     }
 
-   
-   
+    // ❌ prevent login if deactivated
+    if (driver.is_active === false) {
+      return res.status(403).json({
+        message: "Driver account is deactivated",
+      });
+    }
 
     const isMatch = await bcrypt.compare(password, driver.password);
 
@@ -153,6 +151,7 @@ const loginDriver = async (req, res) => {
       },
       role: "driver",
     });
+
   } catch (err) {
     console.error(err);
     return res.status(500).json({
@@ -162,7 +161,71 @@ const loginDriver = async (req, res) => {
 };
 
 
+
+
+
+// ==============================
+// 🚫 DEACTIVATE DRIVER (NEW)
+// ==============================
+
+const deactivateDriver = async (req, res) => {
+  console.log("🔥 HIT DEACTIVATE DRIVER");
+  console.log("USER:", req.user);
+  console.log("PARAMS:", req.params);
+
+  try {
+    const driverId = req.params.id; // driver_id from URL
+    const companyId = req.user.id;   // company_id from token
+    const role = req.user.role;
+
+    // ✅ Only companies can deactivate
+    if (role !== "company") {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    // ✅ Check if driver exists and belongs to this company
+    const { data: driverCheck, error: checkError } = await supabase
+      .from("driver")
+      .select("company_id, status, driver_name")
+      .eq("driver_id", driverId)
+      .single();
+
+    if (checkError || !driverCheck) {
+      return res.status(404).json({ message: "Driver not found" });
+    }
+
+    if (driverCheck.company_id !== companyId) {
+      return res.status(403).json({ message: "You do not own this driver" });
+    }
+
+    // ✅ Update the driver status to inactive
+    const { data, error } = await supabase
+      .from("driver")
+      .update({ status: "inactive" })
+      .eq("driver_id", driverId)
+      .select("driver_id, driver_name, status")
+      .single();
+
+    if (error) {
+      console.error("Supabase update error:", error);
+      return res.status(400).json({ message: error.message });
+    }
+
+    return res.json({
+      message: `Driver "${data.driver_name}" has been deactivated successfully`,
+      driver: data,
+    });
+
+  } catch (err) {
+    console.error("Server error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+// ==============================
+// EXPORTS
+// ==============================
 module.exports = {
   addDriver,
   loginDriver,
+  deactivateDriver,
 };
