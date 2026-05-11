@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,65 +6,70 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import iconImage from '../../assets/images/icon.png';
-import { useNavigation } from '@react-navigation/native';
-import { useRoute } from '@react-navigation/native';
-/* =========================
-   DUMMY DATA
-========================= */
-const initialNotifications = [
-  {
-    id: '1',
-    type: 'Drowsiness',
-    time: '10:45 AM',
-    read: false,
-  },
-  {
-    id: '2',
-    type: 'Phone Usage',
-    time: '9:22 AM',
-    read: false,
-  },
-  {
-    id: '3',
-    type: 'Not Looking at Road',
-    time: '8:30 AM',
-    read: false,
-  },
-  {
-    id: '4',
-    type: 'Drowsiness',
-    time: 'Apr 25, 7:40 PM',
-    read: true,
-  },
-];
+import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
-/* =========================
-   COMPONENT
-========================= */
+function formatNotificationTime(isoString) {
+  const date = new Date(isoString);
+  const now = new Date();
+  const isToday =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+
+  const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (isToday) return time;
+
+  const monthDay = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  return `${monthDay}, ${time}`;
+}
+
 export default function Notifications() {
-   const route = useRoute();
-const navigation = useNavigation();
+  const navigation = useNavigation();
+  const route = useRoute();
+  const fromScreen = route.params?.from || "DriverDriving";
 
-const fromScreen = route.params?.from || "DriverDriving";
-  const [notifications, setNotifications] = useState(initialNotifications);
-
+  const { loading: authLoading } = useAuth();
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const soundRef = useRef(null);
 
-  /* 🔊 PLAY SOUND */
+  const fetchNotifications = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.get('/notifications');
+      setNotifications(res.data);
+    } catch (err) {
+      const status = err.response?.status;
+      if (status === 401) setError('Session expired. Please log in again.');
+      else if (status === 403) setError('Only drivers can view notifications.');
+      else setError(err.response?.data?.error || err.message || 'Failed to load notifications');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
+    fetchNotifications();
+  }, [authLoading, fetchNotifications]);
+
   const playAlertSound = async () => {
     try {
       const { sound } = await Audio.Sound.createAsync(
         require('../../assets/alert.mp3')
       );
-
       soundRef.current = sound;
-
       await sound.playAsync();
-
       setTimeout(async () => {
         if (soundRef.current) {
           await soundRef.current.stopAsync();
@@ -72,52 +77,54 @@ const fromScreen = route.params?.from || "DriverDriving";
           soundRef.current = null;
         }
       }, 5000);
-    } catch (error) {
-      console.log('Sound error:', error);
+    } catch (err) {
+      console.log('Sound error:', err);
     }
   };
 
-  /* MARK AS READ */
-  const markAsRead = (id) => {
-    const updated = notifications.map((item) =>
-      item.id === id ? { ...item, read: true } : item
-    );
-    setNotifications(updated);
+  const markAsRead = async (item) => {
+    if (item.isDemo) {
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.notification_id === item.notification_id ? { ...n, is_read: true } : n
+        )
+      );
+      return;
+    }
+
+    try {
+      await api.patch(`/notifications/${item.notification_id}/read`);
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.notification_id === item.notification_id ? { ...n, is_read: true } : n
+        )
+      );
+    } catch (err) {
+      Alert.alert('Error', err.response?.data?.error || 'Failed to mark as read');
+    }
   };
 
-  /* ⏰ GET CURRENT TIME */
-  const getCurrentTime = () => {
-    const now = new Date();
-    return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  /* SIMULATE ALERT */
-  const simulateAlert = async () => {
-    const newNotification = {
-      id: Math.random().toString(),
-      type: 'Drowsiness',
-      time: getCurrentTime(), // ✅ FIXED
-      read: false,
+  const triggerDemoAlert = async () => {
+    const demoNotif = {
+      notification_id: 'demo-' + Math.random().toString(36).slice(2, 10),
+      is_read: false,
+      created_at: new Date().toISOString(),
+      behavior_name: 'Drowsiness',
+      isDemo: true,
     };
-
-    setNotifications([newNotification, ...notifications]);
-
+    setNotifications((prev) => [demoNotif, ...prev]);
     await playAlertSound();
   };
 
-  /* RENDER ITEM */
   const renderItem = ({ item }) => (
     <View style={styles.item}>
       <View style={styles.left}>
-        <Text style={styles.time}>{item.time}</Text>
-        <Text style={styles.type}>{item.type}</Text>
+        <Text style={styles.time}>{formatNotificationTime(item.created_at)}</Text>
+        <Text style={styles.type}>{item.behavior_name}</Text>
       </View>
 
-      {!item.read ? (
-        <TouchableOpacity
-          style={styles.checkBtn}
-          onPress={() => markAsRead(item.id)}
-        >
+      {!item.is_read ? (
+        <TouchableOpacity style={styles.checkBtn} onPress={() => markAsRead(item)}>
           <Text style={styles.checkText}>Check</Text>
         </TouchableOpacity>
       ) : (
@@ -131,26 +138,39 @@ const fromScreen = route.params?.from || "DriverDriving";
 
   return (
     <View style={styles.container}>
-      {/* HEADER */}
       <View style={styles.header}>
         <Image source={iconImage} style={styles.headerIcon} />
         <Text style={styles.headerText}>RoadGuard</Text>
       </View>
 
-      {/* SIMULATE BUTTON */}
-      <TouchableOpacity style={styles.simBtn} onPress={simulateAlert}>
-        <Text style={styles.simText}>Simulate Alert</Text>
+      <TouchableOpacity style={styles.simBtn} onPress={triggerDemoAlert}>
+        <Text style={styles.simText}>Demo: Trigger Alert</Text>
       </TouchableOpacity>
 
-      {/* LIST */}
-      <FlatList
-        data={notifications}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={{ paddingBottom: 80 }}
-      />
+      {loading ? (
+        <View style={styles.centeredMsg}>
+          <ActivityIndicator size="large" color="#000042" />
+        </View>
+      ) : error ? (
+        <View style={styles.centeredMsg}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={fetchNotifications} style={styles.retryBtn}>
+            <Text style={styles.retryBtnText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : notifications.length === 0 ? (
+        <View style={styles.centeredMsg}>
+          <Text style={styles.emptyText}>No notifications this month.</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={notifications}
+          keyExtractor={(item) => item.notification_id}
+          renderItem={renderItem}
+          contentContainerStyle={{ paddingBottom: 80 }}
+        />
+      )}
 
-      {/* FOOTER */}
       <View style={styles.footer}>
         <TouchableOpacity
   style={styles.navItem}
@@ -169,34 +189,27 @@ const fromScreen = route.params?.from || "DriverDriving";
   );
 }
 
-/* =========================
-   STYLES
-========================= */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f2f4f7',
   },
-
   header: {
     backgroundColor: '#000042',
     flexDirection: 'row',
     alignItems: 'center',
     padding: 15,
   },
-
   headerIcon: {
     width: 30,
     height: 30,
     marginRight: 10,
   },
-
   headerText: {
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
   },
-
   simBtn: {
     backgroundColor: '#2563eb',
     margin: 10,
@@ -204,12 +217,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
   },
-
   simText: {
     color: 'white',
     fontWeight: 'bold',
   },
-
   item: {
     flexDirection: 'row',
     backgroundColor: 'white',
@@ -220,22 +231,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-
   left: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-
   time: {
     width: 100,
     color: 'gray',
   },
-
   type: {
     fontWeight: '500',
   },
-
-  /* ✅ SAME SIZE BUTTONS */
   checkBtn: {
     backgroundColor: '#1e3a8a',
     width: 80,
@@ -244,11 +250,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   checkText: {
     color: 'white',
   },
-
   readBtn: {
     flexDirection: 'row',
     backgroundColor: '#f97316',
@@ -258,12 +262,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   readText: {
     color: 'white',
     fontSize: 12,
   },
-
+  centeredMsg: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 30,
+    paddingBottom: 80,
+  },
+  errorText: {
+    color: '#ef4444',
+    textAlign: 'center',
+    marginBottom: 15,
+    fontSize: 14,
+  },
+  emptyText: {
+    color: '#555',
+    textAlign: 'center',
+    fontSize: 14,
+  },
+  retryBtn: {
+    backgroundColor: '#2563eb',
+    paddingVertical: 10,
+    paddingHorizontal: 30,
+    borderRadius: 10,
+  },
+  retryBtnText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
   footer: {
     position: 'absolute',
     bottom: 0,
@@ -273,16 +303,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     padding: 10,
   },
-
   navItem: {
     alignItems: 'center',
   },
-
   activeTab: {
     color: '#f97316',
     fontWeight: 'bold',
   },
-
   inactiveTab: {
     color: '#555',
   },

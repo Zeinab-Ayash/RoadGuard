@@ -3,6 +3,5 @@ node_modules/
 .env
 *.env.local
 .DS_Store
-CLAUDE.md
 *.log
 npm-debug.log*

@@ -3,6 +3,7 @@ const crypto = require("crypto");
 
 const supabase = require("../utils/dbConnection");
 const { signToken } = require("../utils/jwt");
+const Driver = require('../models/Driver');
 
 
 // ==============================
@@ -45,7 +46,7 @@ const addDriver = async (req, res) => {
             password: hashedPassword,
             profile_image: null,
             current_score: 100,
-            is_active: true, // ✅ important
+            is_active: true,
           },
         ])
         .select()
@@ -112,7 +113,6 @@ const loginDriver = async (req, res) => {
       });
     }
 
-    // ❌ prevent login if deactivated
     if (driver.is_active === false) {
       return res.status(403).json({
         message: "Driver account is deactivated",
@@ -127,12 +127,11 @@ const loginDriver = async (req, res) => {
       });
     }
 
-    // ✅ CHECK DRIVER STATUS
-   if (driver.status?.toLowerCase() !== "active") {
-     return res.status(403).json({
-       message: "Driver account is inactive",
-  });
-}
+    if (driver.status?.toLowerCase() !== "active") {
+      return res.status(403).json({
+        message: "Driver account is inactive",
+      });
+    }
 
     const token = signToken({
       id: driver.driver_id,
@@ -161,29 +160,40 @@ const loginDriver = async (req, res) => {
 };
 
 
+// ==============================
+// 📋 LIST DRIVERS
+// ==============================
+const list = async (req, res) => {
+  if (req.user.role !== 'company') {
+    return res.status(403).json({ error: 'Only companies can list drivers' });
+  }
 
+  try {
+    const drivers = await Driver.findByCompany(req.user.id);
+    res.json(drivers);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
 
 
 // ==============================
-// 🚫 DEACTIVATE DRIVER (NEW)
+// 🚫 DEACTIVATE DRIVER
 // ==============================
-
 const deactivateDriver = async (req, res) => {
   console.log("🔥 HIT DEACTIVATE DRIVER");
   console.log("USER:", req.user);
   console.log("PARAMS:", req.params);
 
   try {
-    const driverId = req.params.id; // driver_id from URL
-    const companyId = req.user.id;   // company_id from token
+    const driverId = req.params.id;
+    const companyId = req.user.id;
     const role = req.user.role;
 
-    // ✅ Only companies can deactivate
     if (role !== "company") {
       return res.status(403).json({ message: "Not authorized" });
     }
 
-    // ✅ Check if driver exists and belongs to this company
     const { data: driverCheck, error: checkError } = await supabase
       .from("driver")
       .select("company_id, status, driver_name")
@@ -198,7 +208,6 @@ const deactivateDriver = async (req, res) => {
       return res.status(403).json({ message: "You do not own this driver" });
     }
 
-    // ✅ Update the driver status to inactive
     const { data, error } = await supabase
       .from("driver")
       .update({ status: "inactive" })
@@ -221,11 +230,14 @@ const deactivateDriver = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
+
+
 // ==============================
 // EXPORTS
 // ==============================
 module.exports = {
   addDriver,
   loginDriver,
+  list,
   deactivateDriver,
 };
