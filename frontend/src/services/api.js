@@ -11,6 +11,7 @@ const api = axios.create({
   timeout: 10000,
 });
 
+
 let authToken = null;
 
 export function setAuthToken(token) {
