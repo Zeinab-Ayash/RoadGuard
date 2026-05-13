@@ -1,14 +1,16 @@
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 
 export default function MiraLogin() {
+  const navigation = useNavigation();
   const handleCompany = () => {
-    console.log("Company Pressed");
-  };
+  navigation.navigate("LoginAsCompany");
+};
 
-  const handleDriver = () => {
-    console.log("Driver Pressed");
-  };
+const handleDriver = () => {
+  navigation.navigate("LoginAsDriver");
+};
 
   return (
     <View style={styles.container}>

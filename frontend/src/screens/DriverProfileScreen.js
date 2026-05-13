@@ -1,188 +1,233 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Image,
   ScrollView, TouchableOpacity,
-  SafeAreaView, Alert
+  SafeAreaView, Alert, ActivityIndicator, Platform
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
+
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 export default function DriverProfileScreen() {
-  const [isTodayOpen, setIsTodayOpen] = useState(true);
-  const [driver, setDriver] = useState(null);
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { user, role } = useAuth();
+  const driverId = route.params?.driverId || (role === 'driver' ? user?.driver_id : null);
+  const isViewingOwnProfile = role === 'driver' && !route.params?.driverId;
 
-  // Dummy data (simulate backend)
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [openSection, setOpenSection] = useState('Today');
+
+  const fetchProfile = useCallback(async () => {
+    if (!driverId) {
+      setError('No driver ID provided');
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.get(`/profile/driver/${driverId}`);
+      setData(res.data);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to load driver profile');
+    } finally {
+      setLoading(false);
+    }
+  }, [driverId]);
+
   useEffect(() => {
-    const dummyDriver = {
-      name: "John Doe",
-      company: "Secure Transport LLC",
-      id: "#327918",
-      photo: require("../../assets/images/logo.jpeg"),
-      appLogo: require("../../assets/images/logo.jpeg"),
-      safetyScore: 82,
-      notificationsCount: 2,
-      historyToday: [
-        { id: 1, type: 'Drowsiness', time: '9:25 AM', icon: 'warning', lib: 'Ionicons' },
-        { id: 2, type: 'Phone Usage', time: '9:10 AM', icon: 'cellphone', lib: 'MaterialCommunityIcons' },
-        { id: 3, type: 'Speeding', time: '8:45 AM', icon: 'speedometer', lib: 'MaterialCommunityIcons' },
-      ],
-      monthlyScores: [
-        { month: 'Jan', score: 90 },
-        { month: 'Feb', score: 88 },
-        { month: 'March', score: 84 },
-        { month: 'April', score: 79 },
-        { month: 'May', score: 0 },
-        { month: 'Dec', score: 0 },
-      ]
-    };
-
-    setDriver(dummyDriver);
-  }, []);
+    fetchProfile();
+  }, [fetchProfile]);
 
   const getScoreColor = (score) => {
-    if (score >= 80) return '#22C55E'; // 🟢
-    if (score >= 60) return '#EAB308'; // 🟡
-    if (score >= 40) return '#F97316'; // 🟠
-    return '#EF4444'; // 🔴
+    if (score >= 80) return '#22C55E';
+    if (score >= 60) return '#EAB308';
+    if (score >= 40) return '#F97316';
+    return '#EF4444';
   };
 
-  const renderHistoryIcon = (item) => {
-    if (item.lib === 'Ionicons') {
-      return <Ionicons name={item.icon} size={20} color="#F59E0B" />;
+  const confirmDeactivate = async () => {
+    try {
+      await api.patch(`/driver/deactivate/${driverId}`);
+      if (Platform.OS === 'web') {
+        window.alert('Driver has been deactivated');
+      } else {
+        Alert.alert('Success', 'Driver has been deactivated');
+      }
+      navigation.goBack();
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to deactivate driver';
+      if (Platform.OS === 'web') {
+        window.alert('Failed: ' + msg);
+      } else {
+        Alert.alert('Failed', msg);
+      }
     }
-    return <MaterialCommunityIcons name={item.icon} size={20} color="#F59E0B" />;
   };
 
-  // Confirm Deactivate
   const handleDeactivate = () => {
+    console.log('[Deactivate] button clicked, Platform:', Platform.OS, 'driverId:', driverId);
+    if (Platform.OS === 'web') {
+      const ok = window.confirm('Are you sure you want to deactivate this driver?');
+      console.log('[Deactivate] confirm result:', ok);
+      if (ok) {
+        confirmDeactivate();
+      }
+      return;
+    }
     Alert.alert(
-      "Confirm Deactivation",
-      "Are you sure you want to deactivate this driver?",
+      'Confirm Deactivation',
+      'Are you sure you want to deactivate this driver?',
       [
-        { text: "Cancel", style: "cancel" },
-        { text: "Yes", onPress: () => Alert.alert("Driver Deactivated") }
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Yes', style: 'destructive', onPress: confirmDeactivate }
       ]
     );
   };
 
-  if (!driver) return null;
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#1E3A5F" />
+        <Text style={{ marginTop: 10 }}>Loading driver profile...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <Text style={styles.errorText}>{error || 'No data'}</Text>
+        <TouchableOpacity style={styles.retryBtn} onPress={fetchProfile}>
+          <Text style={styles.retryText}>Retry</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  const { driver, history, monthlyScores } = data;
 
   return (
     <SafeAreaView style={styles.container}>
-
-      {/* HEADER */}
       <View style={styles.header}>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={26} color="white" />
         </TouchableOpacity>
-
         <View style={styles.headerTitleContainer}>
-          <Image source={driver.appLogo} style={styles.headerLogo} />
           <Text style={styles.headerTitle}>RoadGuard</Text>
         </View>
-
-        <View style={{ width: 26 }} /> 
+        <View style={{ width: 26 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
 
-        {/* PROFILE + SCORE */}
         <View style={styles.profileCard}>
-          <Image source={driver.photo} style={styles.avatar} />
+          {driver.profile_image ? (
+            <Image source={{ uri: driver.profile_image }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarFallback]}>
+              <Text style={styles.avatarLetters}>
+                {driver.driver_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+              </Text>
+            </View>
+          )}
 
           <View style={styles.driverInfo}>
-            <Text style={styles.driverName}>{driver.name}</Text>
-            <Text style={styles.companyText}>{driver.company}</Text>
-            <Text style={styles.idText}>{driver.id}</Text>
+            <Text style={styles.driverName}>{driver.driver_name}</Text>
+            <Text style={styles.companyText}>{driver.company_name}</Text>
+            <Text style={styles.idText}>{driver.driver_code}</Text>
           </View>
 
-          {/* SAFETY SCORE */}
           <View style={styles.scoreBox}>
             <Text style={styles.scoreLabel}>Safety Score</Text>
-            <Text style={[styles.scoreValue, { color: getScoreColor(driver.safetyScore) }]}>
-              {driver.safetyScore}
+            <Text style={[styles.scoreValue, { color: getScoreColor(driver.current_score) }]}>
+              {driver.current_score}
             </Text>
           </View>
         </View>
 
-        {/* MISBEHAVIOR */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Misbehavior History</Text>
 
           <TouchableOpacity
-            onPress={() => setIsTodayOpen(!isTodayOpen)}
             style={styles.accordion}
+            onPress={() => setOpenSection(openSection === 'Today' ? null : 'Today')}
           >
             <Text style={styles.subTitle}>Today</Text>
-            <Ionicons
-              name={isTodayOpen ? "chevron-down" : "chevron-forward"}
-              size={18}
-            />
+            <Ionicons name={openSection === 'Today' ? 'chevron-down' : 'chevron-forward'} size={18} />
           </TouchableOpacity>
 
-          {isTodayOpen &&
-            driver.historyToday.map((item) => (
-              <View key={item.id} style={styles.historyItem}>
-                <View style={styles.row}>
-                  {renderHistoryIcon(item)}
-                  <Text style={styles.historyText}>{item.type}</Text>
+          {openSection === 'Today' && (
+            history.today.length > 0 ? (
+              history.today.map((item) => (
+                <View key={item.id} style={styles.historyItem}>
+                  <View style={styles.row}>
+                    <MaterialCommunityIcons name="alert-circle-outline" size={20} color="#F59E0B" />
+                    <Text style={styles.historyText}>{item.behavior_name}</Text>
+                  </View>
+                  <Text style={styles.time}>{item.time}</Text>
                 </View>
-                <Text style={styles.time}>{item.time}</Text>
-              </View>
-            ))
-          }
+              ))
+            ) : (
+              <Text style={styles.emptyText}>No incidents today</Text>
+            )
+          )}
 
-          {['Last 7 Days', 'April', 'February', 'January'].map((title, index) => (
-            <TouchableOpacity key={index} style={styles.accordion}>
-              <Text>{title}</Text>
-              <Ionicons name="chevron-forward" size={18} />
-            </TouchableOpacity>
+          {Object.keys(history.monthlyHistory || {}).map((month) => (
+            <View key={month}>
+              <TouchableOpacity
+                style={styles.accordion}
+                onPress={() => setOpenSection(openSection === month ? null : month)}
+              >
+                <Text>{month}</Text>
+                <Ionicons name={openSection === month ? 'chevron-down' : 'chevron-forward'} size={18} />
+              </TouchableOpacity>
+
+              {openSection === month && history.monthlyHistory[month].map((item) => (
+                <View key={item.id} style={styles.historyItem}>
+                  <View style={styles.row}>
+                    <MaterialCommunityIcons name="history" size={20} color="#F59E0B" />
+                    <Text style={styles.historyText}>{item.behavior_name}</Text>
+                  </View>
+                  <Text style={styles.time}>{item.time}</Text>
+                </View>
+              ))}
+            </View>
           ))}
         </View>
 
-        {/* MONTHLY SCORES */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Monthly Scores</Text>
-
           <View style={styles.monthsRow}>
-            {driver.monthlyScores.map((m, index) => (
-              <View key={index} style={styles.monthBadge}>
-                <View style={[styles.scoreCircleSmall, { borderColor: getScoreColor(m.score) }]}>
-                  <Text style={[styles.smallScoreText, { color: m.score > 0 ? '#1F2937' : '#9CA3AF' }]}>
-                    {m.score > 0 ? m.score : '--'}
-                  </Text>
+            {monthlyScores && monthlyScores.length > 0 ? (
+              monthlyScores.map((m, i) => (
+                <View key={i} style={styles.monthBadge}>
+                  <View style={[styles.scoreCircleSmall, { borderColor: getScoreColor(m.score) }]}>
+                    <Text style={[styles.smallScoreText, { color: m.score > 0 ? '#1F2937' : '#9CA3AF' }]}>
+                      {m.score > 0 ? m.score : '--'}
+                    </Text>
+                  </View>
+                  <Text style={styles.monthLabel}>{MONTH_NAMES[m.month - 1]}</Text>
                 </View>
-                <Text style={styles.monthLabel}>{m.month}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* DEACTIVATE BUTTON */}
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleDeactivate}>
-          <Text style={styles.logoutText}>Deactivate Driver</Text>
-        </TouchableOpacity>
-
-      </ScrollView>
-
-      {/* BOTTOM NAV */}
-      <View style={styles.bottomNav}>
-        <View style={styles.navItem}>
-          <Ionicons name="person" size={26} color="#F97316" />
-          <Text style={[styles.navText, { color: '#F97316' }]}>Profile</Text>
-        </View>
-
-        <View style={styles.navItem}>
-          <View>
-            <Ionicons name="notifications" size={26} color="#1E3A5F" />
-            {driver.notificationsCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{driver.notificationsCount}</Text>
-              </View>
+              ))
+            ) : (
+              <Text style={styles.emptyText}>No monthly scores yet</Text>
             )}
           </View>
-          <Text style={styles.navText}>Notifications</Text>
         </View>
-      </View>
+
+        {!isViewingOwnProfile && (
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleDeactivate}>
+            <Text style={styles.logoutText}>Deactivate Driver</Text>
+          </TouchableOpacity>
+        )}
+      </ScrollView>
 
     </SafeAreaView>
   );
@@ -190,6 +235,10 @@ export default function DriverProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFF' },
+  centered: { justifyContent: 'center', alignItems: 'center' },
+  errorText: { color: '#EF4444', textAlign: 'center', marginBottom: 20, paddingHorizontal: 20 },
+  retryBtn: { backgroundColor: '#2563eb', paddingVertical: 10, paddingHorizontal: 30, borderRadius: 10 },
+  retryText: { color: 'white', fontWeight: 'bold' },
 
   header: {
     backgroundColor: '#1E3A5F',
@@ -199,28 +248,13 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     paddingHorizontal: 15,
   },
-
-  headerTitleContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  headerLogo: {
-    width: 40,
-    height: 40,
-    marginRight: 8,
-  },
-
-  headerTitle: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
-  },
+  headerTitleContainer: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { color: 'white', fontSize: 18, fontWeight: '600' },
 
   profileCard: { flexDirection: 'row', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   avatar: { width: 85, height: 85, borderRadius: 45, backgroundColor: '#EEE' },
+  avatarFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#000042' },
+  avatarLetters: { color: 'white', fontSize: 26, fontWeight: 'bold' },
   driverInfo: { flex: 1, marginLeft: 15 },
   driverName: { fontSize: 22, fontWeight: 'bold', color: '#1F2937' },
   companyText: { fontSize: 14, color: '#6B7280' },
@@ -234,15 +268,11 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontWeight: 'bold' },
   subTitle: { marginTop: 10 },
 
-  historyItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10
-  },
-
+  historyItem: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   historyText: { marginLeft: 10 },
   time: { color: '#9CA3AF' },
+  emptyText: { color: '#9CA3AF', paddingVertical: 10, fontStyle: 'italic' },
 
   accordion: {
     flexDirection: 'row',
@@ -253,44 +283,13 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F3F4F6'
   },
 
-  monthsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10
-  },
+  monthsRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, flexWrap: 'wrap' },
+  monthBadge: { alignItems: 'center', marginHorizontal: 4, marginVertical: 6 },
+  scoreCircleSmall: { width: 48, height: 48, borderRadius: 24, borderWidth: 3, alignItems: 'center', justifyContent: 'center' },
+  smallScoreText: { fontWeight: 'bold', fontSize: 14 },
+  monthLabel: { fontSize: 12, color: '#9CA3AF', marginTop: 4 },
 
-  monthBadge: {
-    alignItems: 'center'
-  },
-
-  scoreCircleSmall: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 3,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-
-  smallScoreText: {
-    fontWeight: 'bold',
-    fontSize: 14
-  },
-
-  monthLabel: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginTop: 4
-  },
-
-  logoutBtn: {
-    backgroundColor: '#F97316',
-    margin: 20,
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center'
-  },
-
+  logoutBtn: { backgroundColor: '#F97316', margin: 20, padding: 15, borderRadius: 10, alignItems: 'center' },
   logoutText: { color: 'white', fontWeight: 'bold' },
 
   bottomNav: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#EEE', paddingVertical: 10, backgroundColor: '#FFF' },

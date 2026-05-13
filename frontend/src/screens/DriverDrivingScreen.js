@@ -1,320 +1,384 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Image,
   ScrollView, TouchableOpacity,
-  SafeAreaView
+  SafeAreaView, Alert, ActivityIndicator, Platform
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
+import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
-export default function DriverDashboardScreen() {
-  const [isTodayOpen, setIsTodayOpen] = useState(true);
-  const [driver, setDriver] = useState(null);
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-  useEffect(() => {
-    // 🔥 Replace later with API call
-    const dummyDriver = {
-      name: "John Doe",
-      company: "Secure Transport LLC",
-      id: "#3279102",
-      photo: require("../../assets/images/logo.jpeg"),
-      safetyScore: 82,
-      notificationsCount: 2,
-      historyToday: [
-        { id: 1, type: 'Drowsiness', time: '9:25 AM', icon: 'warning', lib: 'Ionicons' },
-        { id: 2, type: 'Phone Usage', time: '9:10 AM', icon: 'cellphone', lib: 'MaterialCommunityIcons' },
-        { id: 3, type: 'Speeding', time: '8:45 AM', icon: 'speedometer', lib: 'MaterialCommunityIcons' },
-      ],
-      monthlyScores: [
-        { month: 'Jan', score: 90 },
-        { month: 'Feb', score: 88 },
-        { month: 'March', score: 84 },
-        { month: 'April', score: 79 },
-        { month: 'May', score: 0 },
-        { month: 'Dec', score: 0 },
-      ]
-    };
+const DEMO_BEHAVIORS = ['Drowsiness', 'Phone Usage', 'Eyes Off Road', 'No Seatbelt', 'Eating While Driving'];
 
-    setDriver(dummyDriver);
-  }, []);
+export default function DriverDrivingScreen() {
+  const navigation = useNavigation();
+  const { user, logout } = useAuth();
+  const driverId = user?.driver_id;
+  const [triggering, setTriggering] = useState(false);
+
+  const handleLogout = async () => {
+    await logout();
+    navigation.replace('LoginAs');
+  };
+
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [openSection, setOpenSection] = useState('Today');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const fetchProfile = useCallback(async () => {
+    if (!driverId) {
+      setError('Not logged in as a driver');
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.get(`/profile/driver/${driverId}`);
+      setData(res.data);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to load profile');
+    } finally {
+      setLoading(false);
+    }
+  }, [driverId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchProfile();
+    }, [fetchProfile])
+  );
 
   const getScoreColor = (score) => {
-    if (score >= 80) return '#22C55E'; // 🟢
-    if (score >= 60) return '#EAB308'; // 🟡
-    if (score >= 40) return '#F97316'; // 🟠
-    return '#EF4444'; // 🔴
+    if (score >= 80) return '#22C55E';
+    if (score >= 60) return '#EAB308';
+    if (score >= 40) return '#F97316';
+    return '#EF4444';
   };
 
-  const renderIcon = (item) => {
-    if (item.lib === 'Ionicons') {
-      return <Ionicons name={item.icon} size={20} color="#F59E0B" />;
+  const handleAvatarPress = async () => {
+    if (uploadingPhoto) return;
+
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please allow access to your photos.');
+        return;
+      }
     }
-    return <MaterialCommunityIcons name={item.icon} size={20} color="#F59E0B" />;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (result.canceled) return;
+
+    const asset = result.assets[0];
+    setUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      if (Platform.OS === 'web') {
+        const blob = await (await fetch(asset.uri)).blob();
+        formData.append('photo', blob, asset.fileName || 'profile.jpg');
+      } else {
+        formData.append('photo', {
+          uri: asset.uri,
+          type: asset.mimeType || 'image/jpeg',
+          name: asset.fileName || 'profile.jpg',
+        });
+      }
+      await api.patch('/driver/me', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        transformRequest: (d) => d,
+      });
+      await fetchProfile();
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'Upload failed';
+      if (Platform.OS === 'web') window.alert('Upload failed: ' + msg);
+      else Alert.alert('Upload failed', msg);
+    } finally {
+      setUploadingPhoto(false);
+    }
   };
 
-  if (!driver) return null;
+  const triggerDemoMisbehavior = async () => {
+    if (triggering) return;
+    setTriggering(true);
+    try {
+      const behavior_name = DEMO_BEHAVIORS[Math.floor(Math.random() * DEMO_BEHAVIORS.length)];
+      const res = await api.post('/misbehavior', { behavior_name });
+      await fetchProfile();
+      if (Platform.OS === 'web') {
+        window.alert(`Triggered: ${res.data.behavior_name} (-${res.data.severity_score}). Score: ${res.data.new_score}`);
+      } else {
+        Alert.alert('Misbehavior recorded', `${res.data.behavior_name} (-${res.data.severity_score})\nNew score: ${res.data.new_score}`);
+      }
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Failed to trigger misbehavior';
+      if (Platform.OS === 'web') {
+        window.alert('Error: ' + msg);
+      } else {
+        Alert.alert('Error', msg);
+      }
+    } finally {
+      setTriggering(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#1E3A5F" />
+        <Text style={{ marginTop: 10 }}>Loading...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <Text style={styles.errorText}>{error || 'No data'}</Text>
+        <TouchableOpacity style={styles.retryBtn} onPress={fetchProfile}>
+          <Text style={styles.retryText}>Retry</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  const { driver, notificationsCount, history, monthlyScores } = data;
 
   return (
     <SafeAreaView style={styles.container}>
-
-      {/* HEADER */}
       <View style={styles.header}>
-  <TouchableOpacity>
-    <Ionicons name="chevron-back" size={26} color="white" />
-  </TouchableOpacity>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>RoadGuard</Text>
+        </View>
+      </View>
 
-  <View style={styles.headerTitleContainer}>
-    <Image source={require("../../assets/images/logo.jpeg")} style={styles.headerLogo} />
-    <Text style={styles.headerTitle}>RoadGuard</Text>
-  </View>
-
-  <View style={{ width: 26 }} /> 
-</View>
-
-      <ScrollView>
-
-        {/* PROFILE + SCORE */}
+      <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.profileCard}>
-                  <Image source={driver.photo} style={styles.avatar} />
-        
-                  <View style={styles.driverInfo}>
-                    <Text style={styles.driverName}>{driver.name}</Text>
-                    <Text style={styles.companyText}>{driver.company}</Text>
-                    <Text style={styles.idText}>{driver.id}</Text>
-                  </View>
-
-          {/* SCORE */}
+          <TouchableOpacity onPress={handleAvatarPress} activeOpacity={0.8} style={styles.avatarContainer}>
+            {driver.profile_image ? (
+              <Image source={{ uri: driver.profile_image }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, styles.avatarFallback]}>
+                <Text style={styles.avatarLetters}>
+                  {driver.driver_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                </Text>
+              </View>
+            )}
+            <View style={styles.cameraIcon}>
+              {uploadingPhoto
+                ? <ActivityIndicator size={14} color="white" />
+                : <Ionicons name="camera" size={16} color="white" />}
+            </View>
+          </TouchableOpacity>
+          <View style={styles.driverInfo}>
+            <Text style={styles.driverName}>{driver.driver_name}</Text>
+            <Text style={styles.companyText}>{driver.company_name}</Text>
+            <Text style={styles.idText}>{driver.driver_code}</Text>
+          </View>
           <View style={styles.scoreBox}>
             <Text style={styles.scoreLabel}>Safety Score</Text>
-            <Text style={[styles.scoreValue, { color: getScoreColor(driver.safetyScore) }]}>
-              {driver.safetyScore}
+            <Text style={[styles.scoreValue, { color: getScoreColor(driver.current_score) }]}>
+              {driver.current_score}
             </Text>
           </View>
         </View>
 
-        {/* START DRIVING BUTTON */}
-        <TouchableOpacity style={styles.startBtn}>
-          <Ionicons name="power" size={20} color="white" />
+        <TouchableOpacity
+          style={styles.startBtn}
+          onPress={() => Alert.alert('Coming Soon', 'AI driving session start/stop will be added in Phase 8.')}
+        >
+          <Ionicons name="play-circle" size={22} color="white" />
           <Text style={styles.startText}>Start Driving</Text>
         </TouchableOpacity>
 
-        {/* MISBEHAVIOR */}
+        <TouchableOpacity
+          style={[styles.demoBtn, triggering && { opacity: 0.6 }]}
+          onPress={triggerDemoMisbehavior}
+          disabled={triggering}
+        >
+          <Ionicons name="alert-circle-outline" size={18} color="#2563eb" />
+          <Text style={styles.demoText}>{triggering ? 'Recording...' : 'Demo: Trigger Misbehavior'}</Text>
+        </TouchableOpacity>
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Misbehavior History</Text>
 
           <TouchableOpacity
-  onPress={() => setIsTodayOpen(!isTodayOpen)}
-  style={styles.accordion}
->
-  <Text style={styles.subTitle}>Today</Text>
-  <Ionicons
-    name={isTodayOpen ? "chevron-down" : "chevron-forward"}
-    size={18}
-  />
-</TouchableOpacity>
+            style={styles.accordion}
+            onPress={() => setOpenSection(openSection === 'Today' ? null : 'Today')}
+          >
+            <Text style={styles.subTitle}>Today</Text>
+            <Ionicons name={openSection === 'Today' ? 'chevron-down' : 'chevron-forward'} size={18} />
+          </TouchableOpacity>
 
-{isTodayOpen &&
-  driver.historyToday.map(item => (
-    <View key={item.id} style={styles.historyItem}>
-      <View style={styles.row}>
-        {renderIcon(item)}
-        <Text style={styles.historyText}>{item.type}</Text>
-      </View>
-      <Text style={styles.time}>{item.time}</Text>
-    </View>
-  ))
-}
+          {openSection === 'Today' && (
+            history.today.length > 0 ? (
+              history.today.map((item) => (
+                <View key={item.id} style={styles.historyItem}>
+                  <View style={styles.row}>
+                    <MaterialCommunityIcons name="alert-circle-outline" size={20} color="#F59E0B" />
+                    <Text style={styles.historyText}>{item.behavior_name}</Text>
+                  </View>
+                  <Text style={styles.time}>{item.time}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.emptyText}>No incidents today</Text>
+            )
+          )}
 
-          {['Last 7 Days', 'April', 'February', 'January'].map((t, i) => (
-            <TouchableOpacity key={i} style={styles.accordion}>
-              <Text>{t}</Text>
-              <Ionicons name="chevron-forward" size={18} />
-            </TouchableOpacity>
+          {Object.keys(history.monthlyHistory || {}).map((month) => (
+            <View key={month}>
+              <TouchableOpacity
+                style={styles.accordion}
+                onPress={() => setOpenSection(openSection === month ? null : month)}
+              >
+                <Text>{month}</Text>
+                <Ionicons name={openSection === month ? 'chevron-down' : 'chevron-forward'} size={18} />
+              </TouchableOpacity>
+              {openSection === month && history.monthlyHistory[month].map((item) => (
+                <View key={item.id} style={styles.historyItem}>
+                  <View style={styles.row}>
+                    <MaterialCommunityIcons name="history" size={20} color="#F59E0B" />
+                    <Text style={styles.historyText}>{item.behavior_name}</Text>
+                  </View>
+                  <Text style={styles.time}>{item.time}</Text>
+                </View>
+              ))}
+            </View>
           ))}
         </View>
 
-        {/* MONTHLY SCORES */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Monthly Scores</Text>
 
           <View style={styles.monthsRow}>
-  {driver.monthlyScores.map((m, index) => (
-    <View key={index} style={styles.monthBadge}>
-      <View
-        style={[
-          styles.scoreCircleSmall,
-          { borderColor: getScoreColor(m.score) }
-        ]}
-      >
-        <Text
-          style={[
-            styles.smallScoreText,
-            { color: m.score > 0 ? '#1F2937' : '#9CA3AF' }
-          ]}
-        >
-          {m.score > 0 ? m.score : '--'}
-        </Text>
-      </View>
-
-      <Text style={styles.monthLabel}>{m.month}</Text>
-    </View>
-  ))}
-</View>
+            {monthlyScores && monthlyScores.length > 0 ? (
+              monthlyScores.map((m, i) => (
+                <View key={i} style={styles.monthBadge}>
+                  <View style={[styles.scoreCircleSmall, { borderColor: getScoreColor(m.score) }]}>
+                    <Text style={[styles.smallScoreText, { color: m.score > 0 ? '#1F2937' : '#9CA3AF' }]}>
+                      {m.score > 0 ? m.score : '--'}
+                    </Text>
+                  </View>
+                  <Text style={styles.monthLabel}>{MONTH_NAMES[m.month - 1]}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.emptyText}>No monthly scores yet</Text>
+            )}
+          </View>
         </View>
 
-        {/* LOGOUT */}
-        <TouchableOpacity style={styles.logoutBtn}>
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={20} color="white" />
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
-
       </ScrollView>
 
-      {/* BOTTOM NAV */}
       <View style={styles.bottomNav}>
-              <View style={styles.navItem}>
-                <Ionicons name="person" size={26} color="#F97316" />
-                <Text style={[styles.navText, { color: '#F97316' }]}>Profile</Text>
+        <View style={styles.navItem}>
+          <Ionicons name="person" size={26} color="#F97316" />
+          <Text style={[styles.navText, { color: '#F97316' }]}>Profile</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => navigation.navigate('Notifications', { from: 'DriverDriving' })}
+        >
+          <View>
+            <Ionicons name="notifications" size={26} color="#1E3A5F" />
+            {notificationsCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{notificationsCount}</Text>
               </View>
-      
-              <View style={styles.navItem}>
-                <View>
-                  <Ionicons name="notifications" size={26} color="#1E3A5F" />
-                  {driver.notificationsCount > 0 && (
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>{driver.notificationsCount}</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.navText}>Notifications</Text>
-              </View>
-            </View>
-
+            )}
+          </View>
+          <Text style={styles.navText}>Notifications</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFF' },
+  centered: { justifyContent: 'center', alignItems: 'center' },
+  errorText: { color: '#EF4444', textAlign: 'center', marginBottom: 20, paddingHorizontal: 20 },
+  retryBtn: { backgroundColor: '#2563eb', paddingVertical: 10, paddingHorizontal: 30, borderRadius: 10 },
+  retryText: { color: 'white', fontWeight: 'bold' },
 
- header: {
-  backgroundColor: '#1E3A5F',
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  paddingVertical: 20, // keep new taller height
-  paddingHorizontal: 15,
-},
-
-headerTitleContainer: {
-  flex: 1,
-  flexDirection: 'row',
-  justifyContent: 'center',
-  alignItems: 'center',
-},
-
-headerLogo: {
-  width: 40,
-  height: 40,
-  marginRight: 8,
-},
-
-headerTitle: {
-  color: 'white',
-  fontSize: 18,
-  fontWeight: '600',
-},
+  header: {
+    backgroundColor: '#1E3A5F',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 20,
+    paddingHorizontal: 15,
+  },
+  headerTitleContainer: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { color: 'white', fontSize: 18, fontWeight: '600' },
 
   profileCard: { flexDirection: 'row', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  avatarContainer: { position: 'relative' },
+  cameraIcon: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#F97316', width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'white' },
   avatar: { width: 85, height: 85, borderRadius: 45, backgroundColor: '#EEE' },
+  avatarFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#000042' },
+  avatarLetters: { color: 'white', fontSize: 26, fontWeight: 'bold' },
   driverInfo: { flex: 1, marginLeft: 15 },
   driverName: { fontSize: 22, fontWeight: 'bold', color: '#1F2937' },
   companyText: { fontSize: 14, color: '#6B7280' },
   idText: { fontSize: 12, color: '#9CA3AF' },
 
-  name: { fontSize: 18, fontWeight: 'bold' },
-  company: { color: '#6B7280' },
-  id: { color: '#9CA3AF', fontSize: 12 },
-
   scoreBox: { alignItems: 'center' },
   scoreLabel: { fontSize: 12, color: '#9CA3AF' },
   scoreValue: { fontSize: 28, fontWeight: 'bold' },
 
-  startBtn: {
-    backgroundColor: '#F97316',
-    marginHorizontal: 20,
-    padding: 15,
-    borderRadius: 25,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 10
-  },
+  startBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#16a34a', marginHorizontal: 20, marginTop: 20, padding: 15, borderRadius: 12, gap: 8 },
+  startText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
 
-  startText: { color: 'white', fontWeight: 'bold' },
+  demoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'white', borderWidth: 1, borderColor: '#2563eb', marginHorizontal: 20, marginTop: 10, padding: 10, borderRadius: 8, gap: 6 },
+  demoText: { color: '#2563eb', fontWeight: '600', fontSize: 13 },
+
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F97316', marginHorizontal: 20, marginTop: 10, marginBottom: 20, padding: 15, borderRadius: 12, gap: 8 },
+  logoutText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
 
   section: { padding: 20 },
   sectionTitle: { fontSize: 18, fontWeight: 'bold' },
   subTitle: { marginTop: 10 },
 
-  historyItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10
-  },
-
+  historyItem: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   historyText: { marginLeft: 10 },
   time: { color: '#9CA3AF' },
+  emptyText: { color: '#9CA3AF', paddingVertical: 10, fontStyle: 'italic' },
 
   accordion: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  paddingVertical: 12,
-  borderBottomWidth: 1,
-  borderBottomColor: '#F3F4F6'
-},
-
- monthsRow: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  marginTop: 10
-},
-
-monthBadge: {
-  alignItems: 'center'
-},
-
-scoreCircleSmall: {
-  width: 48,
-  height: 48,
-  borderRadius: 24,
-  borderWidth: 3,
-  alignItems: 'center',
-  justifyContent: 'center'
-},
-
-smallScoreText: {
-  fontWeight: 'bold',
-  fontSize: 14
-},
-
-monthLabel: {
-  fontSize: 12,
-  color: '#9CA3AF',
-  marginTop: 4
-},
-
-  logoutBtn: {
-    backgroundColor: '#F97316',
-    margin: 20,
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center'
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6'
   },
 
-  logoutText: { color: 'white', fontWeight: 'bold' },
+  monthsRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, flexWrap: 'wrap' },
+  monthBadge: { alignItems: 'center', marginHorizontal: 4, marginVertical: 6 },
+  scoreCircleSmall: { width: 48, height: 48, borderRadius: 24, borderWidth: 3, alignItems: 'center', justifyContent: 'center' },
+  smallScoreText: { fontWeight: 'bold', fontSize: 14 },
+  monthLabel: { fontSize: 12, color: '#9CA3AF', marginTop: 4 },
 
-  bottomNav: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#EEE', paddingVertical: 10, backgroundColor: '#FFF' },
+  bottomNav: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#EEE', paddingTop: 10, paddingBottom: Platform.OS === 'ios' ? 30 : 20, backgroundColor: '#FFF' },
   navItem: { flex: 1, alignItems: 'center' },
   badge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#EF4444', borderRadius: 10, width: 18, height: 18, alignItems: 'center', justifyContent: 'center' },
   badgeText: { color: 'white', fontSize: 10, fontWeight: 'bold' },

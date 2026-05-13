@@ -8,9 +8,11 @@ import {
   Image,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import iconImage from '../../assets/images/icon.png';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -30,7 +32,11 @@ function formatNotificationTime(isoString) {
   return `${monthDay}, ${time}`;
 }
 
-export default function Notifications({ navigation }) {
+export default function Notifications() {
+  const navigation = useNavigation();
+  const route = useRoute();
+  const fromScreen = route.params?.from || "DriverDriving";
+
   const { loading: authLoading } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -167,18 +173,18 @@ export default function Notifications({ navigation }) {
       )}
 
       <View style={styles.footer}>
+        <TouchableOpacity
+  style={styles.navItem}
+  onPress={() => navigation.navigate(fromScreen)}
+>
+  <Ionicons name="person" size={22} color="#555" />
+  <Text style={styles.inactiveTab}>Profile</Text>
+</TouchableOpacity>
         <TouchableOpacity style={styles.navItem}>
           <Ionicons name="notifications" size={22} color="#f97316" />
           <Text style={styles.activeTab}>Notifications</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => navigation.navigate('DriverDriving')}
-        >
-          <Ionicons name="person" size={22} color="#555" />
-          <Text style={styles.inactiveTab}>Profile</Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -296,7 +302,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     backgroundColor: 'white',
-    padding: 10,
+    paddingTop: 10,
+    paddingHorizontal: 10,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 20,
   },
   navItem: {
     alignItems: 'center',
