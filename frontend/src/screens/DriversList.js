@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -8,6 +9,7 @@ import {
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -68,7 +70,7 @@ export default function DriversList({ navigation }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get('/drivers');
+      const res = await api.get('/driver');
       setDrivers(res.data);
     } catch (err) {
       const status = err.response?.status;
@@ -83,6 +85,13 @@ export default function DriversList({ navigation }) {
     if (authLoading) return;
     fetchDrivers();
   }, [authLoading, fetchDrivers]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (authLoading) return;
+      fetchDrivers();
+    }, [authLoading, fetchDrivers])
+  );
 
   const handleDriverPress = (driver) => {
     navigation.navigate('DriverProfile', { driverId: driver.driver_id });
@@ -300,7 +309,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     backgroundColor: 'white',
-    padding: 10,
+    paddingTop: 10,
+    paddingHorizontal: 10,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 20,
   },
   navItem: { alignItems: 'center', justifyContent: 'center' },
 });

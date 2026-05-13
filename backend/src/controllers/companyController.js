@@ -48,7 +48,9 @@ exports.signupCompany = async (req, res) => {
 
     res.status(201).json({
       message: 'Company created successfully',
-      company: {
+      token,
+      role: 'company',
+      user: {
         company_id: data.company_id,
         company_name: data.company_name,
         email: data.email,
@@ -94,7 +96,8 @@ exports.loginCompany = async (req, res) => {
     res.json({
       message: 'Login successful',
       token,
-      company: {
+      role: 'company',
+      user: {
         company_id: company.company_id,
         company_name: company.company_name,
         email: company.email,

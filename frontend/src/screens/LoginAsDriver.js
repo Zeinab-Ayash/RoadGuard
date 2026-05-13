@@ -62,7 +62,7 @@ const handleLogin = async () => {
 
     await login(res.data.token, res.data.user, res.data.role);
 
-    navigation.navigate("DriverProfile");
+    navigation.navigate("DriverDriving");
   } catch (err) {
     alert(err.response?.data?.message || "Login failed");
   }

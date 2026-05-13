@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -45,7 +46,7 @@ export default function CompanyDashboard({ navigation }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get('/drivers');
+      const res = await api.get('/driver');
       setDrivers(res.data);
     } catch (err) {
       const status = err.response?.status;
@@ -63,6 +64,13 @@ export default function CompanyDashboard({ navigation }) {
     if (authLoading) return;
     fetchDrivers();
   }, [authLoading, fetchDrivers]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (authLoading) return;
+      fetchDrivers();
+    }, [authLoading, fetchDrivers])
+  );
 
   const handleLogout = async () => {
     await logout();
@@ -104,7 +112,10 @@ export default function CompanyDashboard({ navigation }) {
         });
       }
 
-      const res = await api.patch('/companies/me', formData);
+      const res = await api.patch('/company/me', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        transformRequest: (d) => d,
+      });
       updateUser(res.data);
     } catch (err) {
       const msg = err.response?.data?.error || err.message || 'Upload failed';
@@ -390,7 +401,9 @@ const styles = StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-around',
-    padding: 10,
+    paddingTop: 10,
+    paddingHorizontal: 10,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 20,
     backgroundColor: 'white',
   },
 

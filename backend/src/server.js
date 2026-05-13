@@ -10,6 +10,7 @@ const companyRoutes = require('./routes/companyRoutes');
 const driverRoutes = require('./routes/driverRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const profileRoutes = require('./routes/profileRoutes');
+const misbehaviorRoutes = require('./routes/misbehaviorRoutes');
 
 const app = express();
 
@@ -23,6 +24,7 @@ app.use('/company', companyRoutes);
 app.use('/driver', driverRoutes);
 app.use('/notifications', notificationRoutes);
 app.use('/profile', profileRoutes);
+app.use('/misbehavior', misbehaviorRoutes);
 
 /* ================= HEALTH CHECK ================= */
 app.get('/health', (req, res) => {

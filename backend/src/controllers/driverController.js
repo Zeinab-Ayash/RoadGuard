@@ -46,7 +46,7 @@ const addDriver = async (req, res) => {
             password: hashedPassword,
             profile_image: null,
             current_score: 100,
-            is_active: true,
+            status: 'active',
           },
         ])
         .select()
@@ -233,6 +233,54 @@ const deactivateDriver = async (req, res) => {
 
 
 // ==============================
+// 🖼️ UPDATE DRIVER PROFILE (photo, etc.)
+// ==============================
+const path = require('path');
+const { uploadImage } = require('../utils/storage');
+
+const updateMe = async (req, res) => {
+  if (req.user.role !== 'driver') {
+    return res.status(403).json({ error: 'Only drivers can update their own profile' });
+  }
+
+  try {
+    const driverId = req.user.id;
+    const updates = {};
+
+    if (req.file) {
+      const ext = (path.extname(req.file.originalname) || '.jpg').toLowerCase();
+      const filename = `${driverId}-${Date.now()}${ext}`;
+      const url = await uploadImage({
+        bucket: 'driver-profiles',
+        path: filename,
+        file: req.file.buffer,
+        contentType: req.file.mimetype,
+      });
+      updates.profile_image = url;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    const { data, error } = await supabase
+      .from('driver')
+      .update(updates)
+      .eq('driver_id', driverId)
+      .select('driver_id, driver_name, driver_code, phone, profile_image, current_score')
+      .single();
+
+    if (error) return res.status(400).json({ error: error.message });
+
+    return res.json(data);
+  } catch (err) {
+    console.error('updateMe (driver) error:', err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+
+// ==============================
 // EXPORTS
 // ==============================
 module.exports = {
@@ -240,4 +288,5 @@ module.exports = {
   loginDriver,
   list,
   deactivateDriver,
+  updateMe,
 };
