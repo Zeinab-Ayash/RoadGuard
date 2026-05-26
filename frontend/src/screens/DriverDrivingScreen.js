@@ -9,6 +9,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import iconImage from '../../assets/images/icon.png';
 
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -30,6 +31,8 @@ export default function DriverDrivingScreen() {
   const [error, setError] = useState(null);
   const [openSection, setOpenSection] = useState('Today');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [activeSession, setActiveSession] = useState(null);
+  const [sessionBusy, setSessionBusy] = useState(false);
 
   const fetchProfile = useCallback(async () => {
     if (!driverId) {
@@ -49,10 +52,20 @@ export default function DriverDrivingScreen() {
     }
   }, [driverId]);
 
+  const fetchActiveSession = useCallback(async () => {
+    try {
+      const res = await api.get('/driving-sessions/active');
+      setActiveSession(res.data);
+    } catch (err) {
+      // Silent — non-critical
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       fetchProfile();
-    }, [fetchProfile])
+      fetchActiveSession();
+    }, [fetchProfile, fetchActiveSession])
   );
 
   const getScoreColor = (score) => {
@@ -60,6 +73,36 @@ export default function DriverDrivingScreen() {
     if (score >= 60) return '#EAB308';
     if (score >= 40) return '#F97316';
     return '#EF4444';
+  };
+
+  const handleStartDriving = async () => {
+    if (sessionBusy) return;
+    setSessionBusy(true);
+    try {
+      const res = await api.post('/driving-sessions');
+      setActiveSession(res.data);
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Failed to start session';
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Error', msg);
+    } finally {
+      setSessionBusy(false);
+    }
+  };
+
+  const handleFinishDriving = async () => {
+    if (sessionBusy || !activeSession) return;
+    setSessionBusy(true);
+    try {
+      await api.patch(`/driving-sessions/${activeSession.session_id}/end`);
+      setActiveSession(null);
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Failed to end session';
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Error', msg);
+    } finally {
+      setSessionBusy(false);
+    }
   };
 
   const handleAvatarPress = async () => {
@@ -158,9 +201,8 @@ export default function DriverDrivingScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>RoadGuard</Text>
-        </View>
+        <Image source={iconImage} style={styles.headerIcon} />
+        <Text style={styles.headerText}>RoadGuard</Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -195,11 +237,26 @@ export default function DriverDrivingScreen() {
         </View>
 
         <TouchableOpacity
-          style={styles.startBtn}
-          onPress={() => Alert.alert('Coming Soon', 'AI driving session start/stop will be added in Phase 8.')}
+          style={[
+            styles.startBtn,
+            activeSession && styles.finishBtn,
+            sessionBusy && { opacity: 0.6 },
+          ]}
+          onPress={activeSession ? handleFinishDriving : handleStartDriving}
+          disabled={sessionBusy}
         >
-          <Ionicons name="play-circle" size={22} color="white" />
-          <Text style={styles.startText}>Start Driving</Text>
+          <Ionicons
+            name={activeSession ? 'stop-circle' : 'play-circle'}
+            size={22}
+            color="white"
+          />
+          <Text style={styles.startText}>
+            {sessionBusy
+              ? '...'
+              : activeSession
+                ? 'Finish Driving'
+                : 'Start Driving'}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -319,15 +376,21 @@ const styles = StyleSheet.create({
   retryText: { color: 'white', fontWeight: 'bold' },
 
   header: {
-    backgroundColor: '#1E3A5F',
+    backgroundColor: '#000042',
+    padding: 15,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 20,
-    paddingHorizontal: 15,
   },
-  headerTitleContainer: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { color: 'white', fontSize: 18, fontWeight: '600' },
+  headerIcon: {
+    width: 30,
+    height: 30,
+    marginRight: 10,
+  },
+  headerText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
 
   profileCard: { flexDirection: 'row', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   avatarContainer: { position: 'relative' },
@@ -345,6 +408,7 @@ const styles = StyleSheet.create({
   scoreValue: { fontSize: 28, fontWeight: 'bold' },
 
   startBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#16a34a', marginHorizontal: 20, marginTop: 20, padding: 15, borderRadius: 12, gap: 8 },
+  finishBtn: { backgroundColor: '#dc2626' },
   startText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
 
   demoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'white', borderWidth: 1, borderColor: '#2563eb', marginHorizontal: 20, marginTop: 10, padding: 10, borderRadius: 8, gap: 6 },

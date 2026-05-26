@@ -121,16 +121,14 @@ const handleAddDriver = async () => {
 
           {/* HEADER */}
           <View style={styles.header}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Image
-                source={require("../../assets/images/logo.png")}
-                style={styles.headerIcon}
-              />
-              <Text style={styles.headerText}>RoadGuard</Text>
-            </View>
+            <Image
+              source={require("../../assets/images/icon.png")}
+              style={styles.headerIcon}
+            />
+            <Text style={styles.headerText}>RoadGuard</Text>
 
-            {/* ✅ CLICKABLE BACK BUTTON */}
-            <TouchableOpacity onPress={handleBack}>
+            {/* BACK BUTTON — returns to company dashboard */}
+            <TouchableOpacity onPress={handleBack} style={styles.backButton}>
               <Text style={styles.back}>Back</Text>
             </TouchableOpacity>
           </View>
@@ -250,19 +248,16 @@ const styles = StyleSheet.create({
 
   header: {
     backgroundColor: "#000042",
+    padding: 15,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    padding: 15,
   },
 
-  headerIcon: { width: 30, height: 30 },
+  headerIcon: { width: 30, height: 30, marginRight: 10 },
   headerText: { color: "white", fontSize: 18, fontWeight: "bold" },
 
-  back: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
+  backButton: { marginLeft: "auto" },
+  back: { color: "#fff", fontWeight: "bold" },
 
   imageContainer: {
     height: screenHeight * 0.30,

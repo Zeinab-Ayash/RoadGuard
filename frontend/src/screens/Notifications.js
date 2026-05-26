@@ -77,7 +77,7 @@ export default function Notifications() {
           await soundRef.current.unloadAsync();
           soundRef.current = null;
         }
-      }, 5000);
+      }, 2000);
     } catch (err) {
       console.log('Sound error:', err);
     }

@@ -11,6 +11,7 @@ const driverRoutes = require('./routes/driverRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const misbehaviorRoutes = require('./routes/misbehaviorRoutes');
+const drivingSessionRoutes = require('./routes/drivingSessionRoutes');
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use('/driver', driverRoutes);
 app.use('/notifications', notificationRoutes);
 app.use('/profile', profileRoutes);
 app.use('/misbehavior', misbehaviorRoutes);
+app.use('/driving-sessions', drivingSessionRoutes);
 
 /* ================= HEALTH CHECK ================= */
 app.get('/health', (req, res) => {

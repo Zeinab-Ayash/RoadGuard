@@ -8,6 +8,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import iconImage from '../../assets/images/icon.png';
 
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -116,13 +117,8 @@ export default function DriverProfileScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={26} color="white" />
-        </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>RoadGuard</Text>
-        </View>
-        <View style={{ width: 26 }} />
+        <Image source={iconImage} style={styles.headerIcon} />
+        <Text style={styles.headerText}>RoadGuard</Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -241,15 +237,21 @@ const styles = StyleSheet.create({
   retryText: { color: 'white', fontWeight: 'bold' },
 
   header: {
-    backgroundColor: '#1E3A5F',
+    backgroundColor: '#000042',
+    padding: 15,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 20,
-    paddingHorizontal: 15,
   },
-  headerTitleContainer: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { color: 'white', fontSize: 18, fontWeight: '600' },
+  headerIcon: {
+    width: 30,
+    height: 30,
+    marginRight: 10,
+  },
+  headerText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
 
   profileCard: { flexDirection: 'row', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   avatar: { width: 85, height: 85, borderRadius: 45, backgroundColor: '#EEE' },
