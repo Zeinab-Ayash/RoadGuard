@@ -1,0 +1,13 @@
+train: train/images
+val: valid/images
+test: test/images
+
+nc: 2
+names: ['noSeatbelt', 'seatbelt']
+
+roboflow:
+  workspace: alde7my
+  project: seatbelt-detection-bkyvv
+  version: 1
+  license: Public Domain
+  url: https://universe.roboflow.com/alde7my/seatbelt-detection-bkyvv/dataset/1
