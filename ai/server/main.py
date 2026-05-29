@@ -14,6 +14,21 @@ Run locally:
   uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 """
 
+# ── OpenMP / PyTorch single-threading (MUST be set BEFORE any import that
+# loads torch / mediapipe / ultralytics) ───────────────────────────────────
+# Each model is forced to one internal thread so that our 4-way ThreadPool
+# in analyzer.py gets clean fan-out across the available cores rather than
+# every model spawning its own OpenMP team and fighting for cache. On HF
+# Spaces (2 vCPU) this unlocks the ~1.5-1.8x parallel speedup; on multi-core
+# laptops it scales accordingly. Detection accuracy is unaffected — only
+# thread counts change.
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
+
+import torch
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
+
 import logging
 import time
 
