@@ -178,7 +178,7 @@ def detect_looking_away(transform_matrix):
 # Per CLAUDE.md: confidence threshold ≥ 0.7
 # ============================================================
 
-PHONE_CONFIDENCE_THRESHOLD = 0.5
+PHONE_CONFIDENCE_THRESHOLD = 0.6
 PHONE_COCO_CLASS_NAME = "cell phone"
 
 

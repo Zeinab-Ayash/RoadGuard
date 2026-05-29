@@ -153,7 +153,7 @@
   <script>
     // ─── Config ─────────────────────────────────────────────────────────
     const POLL_INTERVAL_MS  = 2000;   // how often to ask the backend for an active session
-    const FRAME_INTERVAL_MS = 1000;   // 1 fps capture (matches API contract)
+    const FRAME_INTERVAL_MS = 500;    // 2 fps capture — saves ~0.25s of "first frame arrival" latency
     const FRAME_W = 640;
     const FRAME_H = 480;
     const JPEG_QUALITY = 0.7;

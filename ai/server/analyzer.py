@@ -25,6 +25,8 @@ Returns:
     }
 """
 
+from concurrent.futures import ThreadPoolExecutor
+
 import cv2
 import mediapipe as mp
 from ultralytics import YOLO
@@ -81,6 +83,12 @@ class FrameAnalyzer:
         # Custom seatbelt YOLO
         self.seatbelt_model = YOLO(SEATBELT_MODEL_PATH)
 
+        # Thread pool used to run the 4 inference models in parallel inside
+        # analyze(). PyTorch (YOLO) and MediaPipe both release the Python GIL
+        # during native inference, so threads achieve real parallelism here.
+        # 4 workers = one per model.
+        self._pool = ThreadPoolExecutor(max_workers=4)
+
         # Asymmetric sampling state
         self.heavy_every_n_frames = heavy_every_n_frames
         self.frame_count = 0
@@ -114,13 +122,35 @@ class FrameAnalyzer:
         # With the default N=1, every frame is heavy.
         is_heavy = ((self.frame_count - 1) % self.heavy_every_n_frames == 0)
 
-        # MediaPipe expects RGB
+        # MediaPipe expects RGB; YOLO seatbelt model expects 3-channel grayscale.
+        # Prepare the three input variants once.
         image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_rgb)
+        gray_3ch = convert_to_grayscale_3ch(image_bgr)
 
-        # ALWAYS run face landmarker (cheap, needed for drowsy + eyes-off-road)
-        face_result = self.face_landmarker.detect(mp_image)
+        if is_heavy:
+            # ── PARALLEL INFERENCE ─────────────────────────────────────────
+            # Submit all 4 models to the thread pool at once. Each releases the
+            # Python GIL during its native inference call, so the total wall
+            # time is bounded by the slowest model (YOLOv8s COCO, ~500 ms)
+            # instead of the sum (~1000 ms).
+            face_future     = self._pool.submit(self.face_landmarker.detect, mp_image)
+            hand_future     = self._pool.submit(self.hand_landmarker.detect, mp_image)
+            coco_future     = self._pool.submit(self.yolo_coco,     image_bgr, verbose=False)
+            seatbelt_future = self._pool.submit(self.seatbelt_model, gray_3ch, verbose=False)
 
+            face_result      = face_future.result()
+            hand_result      = hand_future.result()
+            yolo_results     = coco_future.result()[0]
+            seatbelt_results = seatbelt_future.result()[0]
+        else:
+            # Light frame — only MediaPipe Face is needed (drowsy + eyes-off).
+            face_result = self.face_landmarker.detect(mp_image)
+            hand_result = None
+            yolo_results = None
+            seatbelt_results = None
+
+        # Extract face outputs (used by drowsy, eyes-off, eating)
         landmarks = face_result.face_landmarks[0] if face_result.face_landmarks else None
         blendshapes = face_result.face_blendshapes[0] if face_result.face_blendshapes else None
         transform_matrix = (
@@ -133,15 +163,7 @@ class FrameAnalyzer:
         looking, yaw, pitch, roll = detect_looking_away(transform_matrix)
 
         if is_heavy:
-            # Heavy frame — run Hand + YOLO models, update cache
-            hand_result = self.hand_landmarker.detect(mp_image)
             hand_landmarks_list = hand_result.hand_landmarks if hand_result.hand_landmarks else []
-
-            yolo_results = self.yolo_coco(image_bgr, verbose=False)[0]
-            seatbelt_results = self.seatbelt_model(
-                convert_to_grayscale_3ch(image_bgr), verbose=False
-            )[0]
-
             phone, phone_conf = detect_phone(yolo_results)
             eating, eating_debug = detect_eating(landmarks, hand_landmarks_list, yolo_results)
             no_seatbelt, seat_conf = detect_no_seatbelt(seatbelt_results)
@@ -195,3 +217,4 @@ class FrameAnalyzer:
     def close(self):
         self.face_landmarker.close()
         self.hand_landmarker.close()
+        self._pool.shutdown(wait=False, cancel_futures=True)

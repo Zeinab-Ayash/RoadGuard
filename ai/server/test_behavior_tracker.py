@@ -35,16 +35,15 @@ def assert_eq(actual, expected, name):
 
 
 # ─────────────────────────────────────────────────────────────────
-# Test 1: Sustained drowsiness fires exactly once at 2.0 s
+# Test 1: Sustained drowsiness fires exactly once at 1.5 s
 # ─────────────────────────────────────────────────────────────────
-print("\nTest 1: sustained drowsy fires once at 2.0 s")
+print("\nTest 1: sustained drowsy fires once at 1.5 s")
 t = BehaviorTracker()
 assert_eq(t.update(make_flags(Drowsiness=True), now=0.0),  [], "t=0.0: streak starts, no fire yet")
 assert_eq(t.update(make_flags(Drowsiness=True), now=0.5),  [], "t=0.5: still building")
-assert_eq(t.update(make_flags(Drowsiness=True), now=1.0),  [], "t=1.0: still building (< 2.0)")
-assert_eq(t.update(make_flags(Drowsiness=True), now=1.5),  [], "t=1.5: still building (< 2.0)")
-assert_eq(t.update(make_flags(Drowsiness=True), now=2.0),  ["Drowsiness"], "t=2.0: FIRES")
-assert_eq(t.update(make_flags(Drowsiness=True), now=2.5),  [], "t=2.5: already fired, no re-fire")
+assert_eq(t.update(make_flags(Drowsiness=True), now=1.0),  [], "t=1.0: still building (< 1.5)")
+assert_eq(t.update(make_flags(Drowsiness=True), now=1.5),  ["Drowsiness"], "t=1.5: FIRES")
+assert_eq(t.update(make_flags(Drowsiness=True), now=2.0),  [], "t=2.0: already fired, no re-fire")
 assert_eq(t.update(make_flags(Drowsiness=True), now=3.0),  [], "t=3.0: still no re-fire (cooldown's job)")
 
 
@@ -71,7 +70,7 @@ t.update(make_flags(Drowsiness=True), now=0.5)
 t.update(make_flags(Drowsiness=False), now=1.0)  # interrupted before threshold
 assert_eq(t.update(make_flags(Drowsiness=True), now=1.5), [], "fresh streak starts")
 assert_eq(t.update(make_flags(Drowsiness=True), now=2.5), [], "still building (1.0 s elapsed)")
-assert_eq(t.update(make_flags(Drowsiness=True), now=3.5), ["Drowsiness"], "FIRES at 2.0 s into new streak")
+assert_eq(t.update(make_flags(Drowsiness=True), now=3.0), ["Drowsiness"], "FIRES at 1.5 s into new streak")
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -86,24 +85,24 @@ result = t.update(make_flags(Drowsiness=True), now=7.0)  # gap of 6 s > 5 s max_
 assert_eq(result, [], "after outage: streak reset, no fire")
 # New streak must build fresh
 assert_eq(t.update(make_flags(Drowsiness=True), now=8.0),  [], "1 s into new streak")
-assert_eq(t.update(make_flags(Drowsiness=True), now=9.0),  ["Drowsiness"], "FIRES at 2.0 s into new streak")
+assert_eq(t.update(make_flags(Drowsiness=True), now=8.5),  ["Drowsiness"], "FIRES at 1.5 s into new streak")
 
 
 # ─────────────────────────────────────────────────────────────────
 # Test 5: Multiple behaviors fire at their own thresholds (different durations)
 # ─────────────────────────────────────────────────────────────────
-print("\nTest 5: drowsy (2.0 s) and no-seatbelt (1.0 s) fire at different times")
+print("\nTest 5: drowsy (1.5 s) and no-seatbelt (1.0 s) fire at different times")
 t = BehaviorTracker()
 # Both True at t=0
 t.update(make_flags(Drowsiness=True, **{"No Seatbelt": True}), now=0.0)
 # Seatbelt fires at t=1.0; drowsy still building
 fired_at_1 = t.update(make_flags(Drowsiness=True, **{"No Seatbelt": True}), now=1.0)
 assert_eq(fired_at_1, ["No Seatbelt"],
-          "t=1.0: seatbelt fires (1.0 s threshold), drowsy still building (< 2.0 s)")
-# Drowsy fires at t=2.0; seatbelt already fired
-fired_at_2 = t.update(make_flags(Drowsiness=True, **{"No Seatbelt": True}), now=2.0)
-assert_eq(fired_at_2, ["Drowsiness"],
-          "t=2.0: drowsy fires, seatbelt does not re-fire (same streak)")
+          "t=1.0: seatbelt fires (1.0 s threshold), drowsy still building (< 1.5 s)")
+# Drowsy fires at t=1.5; seatbelt already fired
+fired_at_15 = t.update(make_flags(Drowsiness=True, **{"No Seatbelt": True}), now=1.5)
+assert_eq(fired_at_15, ["Drowsiness"],
+          "t=1.5: drowsy fires, seatbelt does not re-fire (same streak)")
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -143,7 +142,7 @@ print("\nTest 9: update_from_flags translates analyze_frame's raw keys")
 t = BehaviorTracker()
 raw = {"drowsy": True, "phone": False, "eating": False, "looking_away": False, "no_seatbelt": False}
 t.update_from_flags(raw, now=0.0)
-result = t.update_from_flags(raw, now=2.0)
+result = t.update_from_flags(raw, now=1.5)
 assert_eq(result, ["Drowsiness"], "raw key 'drowsy' mapped to 'Drowsiness'")
 
 
@@ -153,10 +152,10 @@ assert_eq(result, ["Drowsiness"], "raw key 'drowsy' mapped to 'Drowsiness'")
 print("\nTest 10: reset() wipes state for new session")
 t = BehaviorTracker()
 t.update(make_flags(Drowsiness=True), now=0.0)
-t.update(make_flags(Drowsiness=True), now=2.0)  # fires
+t.update(make_flags(Drowsiness=True), now=1.5)  # fires
 t.reset()
-assert_eq(t.update(make_flags(Drowsiness=True), now=2.5), [], "after reset: streak restarts")
-assert_eq(t.update(make_flags(Drowsiness=True), now=4.5), ["Drowsiness"], "FIRES at 2.0 s into new streak")
+assert_eq(t.update(make_flags(Drowsiness=True), now=2.0), [], "after reset: streak restarts")
+assert_eq(t.update(make_flags(Drowsiness=True), now=3.5), ["Drowsiness"], "FIRES at 1.5 s into new streak")
 
 
 # Summary
