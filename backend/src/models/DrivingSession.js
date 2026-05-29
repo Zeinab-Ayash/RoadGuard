@@ -54,4 +54,19 @@ async function getActive(driverId) {
   return data || null;
 }
 
-module.exports = { start, endSession, getActive };
+// Returns the most recently started active session, regardless of which driver.
+// Used by the AI server's browser publisher to auto-pair (it has no login
+// context, so it cannot query by driver_id). For the classroom demo where
+// only one driver is active at a time, this is unambiguous.
+async function getLatestAnyActive() {
+  const { data } = await supabase
+    .from('driving_session')
+    .select('session_id, driver_id, start_time')
+    .eq('is_active', true)
+    .order('start_time', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data || null;
+}
+
+module.exports = { start, endSession, getActive, getLatestAnyActive };

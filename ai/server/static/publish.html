@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>RoadGuard — Camera Publisher</title>
+  <style>
+    :root {
+      --navy: #000042;
+      --orange: #f97316;
+      --blue: #2563eb;
+      --green: #16a34a;
+      --gray: #6b7280;
+      --light: #f3f4f6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--light);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+    }
+    header {
+      width: 100%;
+      max-width: 720px;
+      background: var(--navy);
+      color: white;
+      padding: 14px 20px;
+      border-radius: 8px 8px 0 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 18px; font-weight: 600; }
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--gray);
+      transition: background 0.3s;
+    }
+    .status-dot.connected { background: var(--green); }
+    .status-dot.waiting   { background: var(--orange); }
+    .status-dot.error     { background: #ef4444; }
+
+    main {
+      width: 100%;
+      max-width: 720px;
+      background: white;
+      padding: 20px;
+      border-radius: 0 0 8px 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .status {
+      font-size: 14px;
+      color: var(--gray);
+      margin-bottom: 12px;
+    }
+    .status strong { color: #111; }
+
+    .preview {
+      width: 100%;
+      background: black;
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+    }
+    video {
+      width: 100%;
+      display: block;
+      transform: scaleX(-1);  /* mirror like a selfie */
+    }
+    .overlay {
+      position: absolute;
+      bottom: 8px;
+      left: 8px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: monospace;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .stat {
+      background: var(--light);
+      padding: 12px;
+      border-radius: 6px;
+      text-align: center;
+    }
+    .stat-label { font-size: 11px; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-value { font-size: 18px; font-weight: 600; color: #111; margin-top: 4px; font-family: monospace; }
+
+    .note {
+      margin-top: 16px;
+      font-size: 12px;
+      color: var(--gray);
+      padding: 10px;
+      background: #fef3c7;
+      border-left: 3px solid var(--orange);
+      border-radius: 4px;
+    }
+
+    canvas { display: none; }  /* offscreen for JPEG encoding */
+  </style>
+</head>
+<body>
+  <header>
+    <span id="dot" class="status-dot waiting"></span>
+    <h1>RoadGuard Camera Publisher</h1>
+  </header>
+
+  <main>
+    <p class="status">Status: <strong id="status">Starting…</strong></p>
+
+    <div class="preview">
+      <video id="video" autoplay playsinline muted></video>
+      <div class="overlay" id="overlay">no session</div>
+    </div>
+
+    <canvas id="canvas" width="640" height="480"></canvas>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Session</div>
+        <div class="stat-value" id="session">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Frames sent</div>
+        <div class="stat-value" id="frames">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">FPS</div>
+        <div class="stat-value" id="fps">0.0</div>
+      </div>
+    </div>
+
+    <p class="note">
+      Leave this tab open. The page silently waits for a driving session to start
+      on the phone, then begins streaming the camera automatically. When the
+      session ends, it goes back to waiting. No clicks needed.
+    </p>
+  </main>
+
+  <script>
+    // ─── Config ─────────────────────────────────────────────────────────
+    const POLL_INTERVAL_MS  = 2000;   // how often to ask the backend for an active session
+    const FRAME_INTERVAL_MS = 500;    // 2 fps capture — saves ~0.25s of "first frame arrival" latency
+    const FRAME_W = 640;
+    const FRAME_H = 480;
+    const JPEG_QUALITY = 0.7;
+
+    // Allow overriding the backend URL via ?backend=http://192.168.x.x:3000
+    const params = new URLSearchParams(location.search);
+    const BACKEND = (params.get("backend") || "http://localhost:3000").replace(/\/+$/, "");
+
+    // The /upload WebSocket is served by the SAME host this page came from.
+    const AI_HOST = location.host;
+    const WS_PROTOCOL = location.protocol === "https:" ? "wss" : "ws";
+
+    // ─── State ──────────────────────────────────────────────────────────
+    let currentSessionId = null;   // session id we are currently uploading to
+    let ws = null;                 // active /upload WebSocket
+    let eventsWs = null;           // TEMP /events WebSocket — testing only
+    let captureTimer = null;       // setInterval handle for 1 fps capture
+    let frameCount = 0;
+    let lastFpsTs = 0, lastFpsCount = 0;
+    let lastAlarm = "(none)";
+
+    // ─── Beep — temporary, for testing only ─────────────────────────────
+    // In production the PHONE plays the alarm; this is just so the person
+    // running the test can hear something when an alarm fires.
+    let audioCtx = null;
+    function getAudioCtx() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      return audioCtx;
+    }
+    function beep() {
+      try {
+        const ctx = getAudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = 1000;
+        osc.connect(gain).connect(ctx.destination);
+        gain.gain.value = 0.15;
+        osc.start();
+        osc.stop(ctx.currentTime + 0.25);
+      } catch (e) {
+        console.warn("beep failed:", e);
+      }
+    }
+    // Unlock audio on the very first user interaction with the page.
+    function unlockAudio() {
+      getAudioCtx();
+      window.removeEventListener("click",   unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+    }
+    window.addEventListener("click",   unlockAudio);
+    window.addEventListener("keydown", unlockAudio);
+
+    const $video   = document.getElementById("video");
+    const $canvas  = document.getElementById("canvas");
+    const $status  = document.getElementById("status");
+    const $session = document.getElementById("session");
+    const $frames  = document.getElementById("frames");
+    const $fps     = document.getElementById("fps");
+    const $dot     = document.getElementById("dot");
+    const $overlay = document.getElementById("overlay");
+    const ctx = $canvas.getContext("2d");
+
+    // ─── Camera ─────────────────────────────────────────────────────────
+    async function startCamera() {
+      setStatus("Requesting camera permission…", "waiting");
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: FRAME_W, height: FRAME_H },
+          audio: false,
+        });
+        $video.srcObject = stream;
+        await new Promise(r => $video.onloadedmetadata = r);
+        setStatus("Camera ready. Waiting for a driving session to start…", "waiting");
+        return true;
+      } catch (err) {
+        setStatus("Camera access denied or unavailable: " + err.message, "error");
+        return false;
+      }
+    }
+
+    // ─── Backend polling ────────────────────────────────────────────────
+    async function pollActiveSession() {
+      try {
+        const res = await fetch(`${BACKEND}/sessions/active`, { method: "GET" });
+        if (!res.ok) {
+          console.warn("backend returned", res.status);
+          return;
+        }
+        const data = await res.json();
+        const newId = data.session_id || null;
+
+        if (newId === currentSessionId) return;   // no change
+
+        if (newId === null) {
+          // session ended → stop publishing, go back to idle
+          stopPublishing();
+        } else {
+          // new session detected → start publishing
+          startPublishing(newId);
+        }
+      } catch (err) {
+        // network blip — quiet, will retry next poll
+        console.warn("poll failed:", err.message);
+      }
+    }
+
+    // ─── Publishing ─────────────────────────────────────────────────────
+    function startPublishing(sessionId) {
+      currentSessionId = sessionId;
+      $session.textContent = sessionId.slice(0, 8) + "…";
+      $overlay.textContent = "session " + sessionId.slice(0, 8);
+      setStatus("Connecting to AI server…", "waiting");
+
+      const url = `${WS_PROTOCOL}://${AI_HOST}/upload/${sessionId}`;
+      ws = new WebSocket(url);
+      ws.binaryType = "arraybuffer";
+
+      ws.onopen = () => {
+        setStatus("Streaming camera to session " + sessionId.slice(0,8), "connected");
+        captureTimer = setInterval(captureAndSend, FRAME_INTERVAL_MS);
+      };
+      ws.onerror = (e) => {
+        console.warn("ws error", e);
+        setStatus("WebSocket error", "error");
+      };
+      ws.onclose = () => {
+        if (captureTimer) { clearInterval(captureTimer); captureTimer = null; }
+        if (currentSessionId !== null) {
+          // unexpected close — let the next poll restart us
+          setStatus("Connection lost, retrying…", "waiting");
+          currentSessionId = null;
+        }
+      };
+
+      // TEMP: also subscribe to /events so we can beep on alarms while testing.
+      // In production this listener is the PHONE, not the browser publisher.
+      const eventsUrl = `${WS_PROTOCOL}://${AI_HOST}/events/${sessionId}`;
+      eventsWs = new WebSocket(eventsUrl);
+      eventsWs.onmessage = (ev) => {
+        try {
+          const data = JSON.parse(ev.data);
+          lastAlarm = data.behavior || "?";
+          $overlay.textContent = "🚨 " + lastAlarm;
+          beep();
+          // restore overlay text after a couple of seconds
+          setTimeout(() => {
+            if (currentSessionId)
+              $overlay.textContent = "session " + currentSessionId.slice(0,8);
+          }, 2500);
+        } catch (e) { console.warn("events parse error", e); }
+      };
+      eventsWs.onerror = (e) => console.warn("events ws error", e);
+    }
+
+    function stopPublishing() {
+      if (captureTimer) { clearInterval(captureTimer); captureTimer = null; }
+      if (ws) { ws.close(); ws = null; }
+      if (eventsWs) { eventsWs.close(); eventsWs = null; }   // close TEMP events listener too
+      currentSessionId = null;
+      $session.textContent = "—";
+      $overlay.textContent = "no session";
+      setStatus("Session ended. Waiting for the next one…", "waiting");
+    }
+
+    // ─── Frame capture ──────────────────────────────────────────────────
+    function captureAndSend() {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      // Draw current video frame onto the offscreen canvas, then encode as JPEG.
+      ctx.drawImage($video, 0, 0, FRAME_W, FRAME_H);
+      $canvas.toBlob(blob => {
+        if (!blob) return;
+        blob.arrayBuffer().then(buf => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(buf);
+            frameCount++;
+            $frames.textContent = frameCount;
+            updateFps();
+          }
+        });
+      }, "image/jpeg", JPEG_QUALITY);
+    }
+
+    function updateFps() {
+      const now = performance.now();
+      if (lastFpsTs === 0) { lastFpsTs = now; lastFpsCount = frameCount; return; }
+      const dt = (now - lastFpsTs) / 1000;
+      if (dt >= 1) {
+        const fps = (frameCount - lastFpsCount) / dt;
+        $fps.textContent = fps.toFixed(1);
+        lastFpsTs = now;
+        lastFpsCount = frameCount;
+      }
+    }
+
+    // ─── Helpers ────────────────────────────────────────────────────────
+    function setStatus(msg, dotClass) {
+      $status.textContent = msg;
+      $dot.className = "status-dot " + (dotClass || "");
+    }
+
+    // ─── Entry point ────────────────────────────────────────────────────
+    (async function main() {
+      const ok = await startCamera();
+      if (!ok) return;
+      // Start polling the backend
+      pollActiveSession();
+      setInterval(pollActiveSession, POLL_INTERVAL_MS);
+    })();
+  </script>
+</body>
+</html>

@@ -10,7 +10,7 @@ Logic per behavior (time-based, NOT frame-count):
   - Fires ONCE per streak (cooldown layer in Phase 6 handles re-firing)
 
 Configuration locked from memory `project-phase4-config`:
-  Drowsiness            2.0 s / 5.0 s gap
+  Drowsiness            1.5 s / 5.0 s gap
   Eyes Off Road         1.0 s / 5.0 s gap
   Phone Usage           1.0 s / 5.0 s gap
   Eating While Driving  1.0 s / 5.0 s gap
@@ -20,14 +20,16 @@ Configuration locked from memory `project-phase4-config`:
 import time
 
 
-# Per-behavior config — tuned for the 1 fps CPU deployment.
-# Drowsiness stays at 2.0 s (safety-critical, highest severity, must filter
-# out blinks). Other four lowered to 1.0 s because their intensity thresholds
-# already do most of the filtering — duration is just confirmation, and at
-# 1 fps the duration layer has less filtering power than the industry's
-# 30-fps assumptions. Saves ~1 s of perceived alarm latency in the demo.
+# Per-behavior config.
+# Drowsiness uses 1.5 s — matches the Bosch / Smart Eye commercial-DMS
+# standard. Originally raised to 2.0 s because at 1 fps server processing
+# the threshold was effectively 2 s anyway; now that we ship frames at
+# 2 fps with parallel-model inference, 1.5 s is achievable and industry-
+# aligned. Still well above any plausible blink duration (~0.3 s).
+# Other four behaviours are 1.0 s — their intensity thresholds carry the
+# filtering load; duration is just confirmation.
 BEHAVIOR_CONFIG = {
-    "Drowsiness":           {"duration": 2.0, "max_gap": 5.0},
+    "Drowsiness":           {"duration": 1.5, "max_gap": 5.0},
     "Eyes Off Road":        {"duration": 1.0, "max_gap": 5.0},
     "Phone Usage":          {"duration": 1.0, "max_gap": 5.0},
     "Eating While Driving": {"duration": 1.0, "max_gap": 5.0},
