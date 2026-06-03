@@ -63,27 +63,31 @@ export default function Notifications() {
 useEffect(() => {
   if (authLoading) return;
   
-  // Initial manual fetch on load
+  // 1. Initial manual fetch on component mount
   fetchNotifications();
 
-  // Establish continuous polling check while focused
+  // 2. Establish continuous polling check while focused
   const intervalId = setInterval(async () => {
     try {
       const res = await api.get('/notifications');
       
-      // If server list has more items than current local state array list,
-      // it means the camera daemon just fired a new alert!
-      if (res.data.length > notifications.length && notifications.length > 0) {
-        await playAlertSound(); // Trigger alarm chime sound immediately
-      }
-      setNotifications(res.data);
+      setNotifications((prevNotifications) => {
+        // Compare incoming server data length with the absolute latest local state snapshot
+        if (res.data.length > prevNotifications.length && prevNotifications.length > 0) {
+          // Trigger alarm chime sound immediately (runs safely on background thread)
+          playAlertSound(); 
+        }
+        return res.data; // Updates the state beautifully
+      });
+
     } catch (err) {
       console.log("Background synchronization error:", err.message);
     }
-  }, 3000);
+  }, 3000); // Checks for laptop-generated anomalies every 3 seconds
 
-  return () => clearInterval(intervalId); // Clear loop when closing page view
-}, [authLoading, fetchNotifications, notifications.length]);
+  // 3. Clear loop interval when navigating away from page view
+  return () => clearInterval(intervalId);
+}, [authLoading, fetchNotifications]); // Cleaned up dependency array!
   const playAlertSound = async () => {
     try {
       const { sound } = await Audio.Sound.createAsync(

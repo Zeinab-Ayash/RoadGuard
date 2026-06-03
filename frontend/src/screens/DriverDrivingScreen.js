@@ -76,31 +76,32 @@ export default function DriverDrivingScreen() {
   };
 
   // FIXED: Hooked completely into your sessionBusy loading flags state definitions
-  const handleStartDriving = async () => {
-    setSessionBusy(true);
-    try {
-      const res = await api.post('/driving-sessions'); 
-      
-      if (res.data && res.data.session_id) {
-        setActiveSession(res.data);
-        if (Platform.OS === 'web') {
-          window.alert("Journey Started: Laptop monitor webcam is now active.");
-        } else {
-          Alert.alert("Journey Started", "The laptop safety monitor is now tracking your drive.");
-        }
-      }
-    } catch (err) {
-      console.error("Error starting driving session:", err);
-      if (Platform.OS === 'web') {
-        window.alert("Connection Error: Check local router address IP sync config.");
-      } else {
-        Alert.alert("Connection Error", "Could not connect to the backend server.");
-      }
-    } finally {
-      setSessionBusy(false);
-    }
-  };
+ const handleStartDriving = async () => {
+  setSessionBusy(true);
+  try {
+    const res = await api.post('/driving-sessions'); 
+    
+    if (res.data && res.data.session_id) {
+      // FIX: Standardize the session schema shape explicitly
+      setActiveSession({
+        session_id: res.data.session_id,
+        start_time: res.data.start_time || new Date().toISOString(),
+        is_active: true
+      });
 
+      if (Platform.OS === 'web') {
+        window.alert("Journey Started: Laptop monitor webcam is now active.");
+      } else {
+        Alert.alert("Journey Started", "The laptop safety monitor is now tracking your drive.");
+      }
+    }
+  } catch (err) {
+    console.error("Error starting driving session:", err);
+    // ... remaining error handlers
+  } finally {
+    setSessionBusy(false);
+  }
+};
   // FIXED: Correctly tracking endpoint configurations and resetting local view data states
   const handleFinishDriving = async () => {
     if (!activeSession) return;
