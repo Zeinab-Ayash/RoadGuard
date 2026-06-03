@@ -6,11 +6,16 @@ async function startSession(req, res) {
   }
 
   try {
-    const existing = await DrivingSession.getActive(req.user.id);
-    if (existing) {
-      return res.status(200).json(existing);
+    let session = await DrivingSession.getActive(req.user.id);
+    if (!session) {
+      session = await DrivingSession.start(req.user.id);
     }
-    const session = await DrivingSession.start(req.user.id);
+
+    // BROADCAST REALTIME SIGNAL INSTANTLY TO LAPTOP
+    if (req.io) {
+      req.io.emit('SESSION_STARTED', { session_id: session.session_id });
+    }
+
     return res.status(201).json(session);
   } catch (err) {
     console.error('startSession error:', err);
@@ -25,9 +30,14 @@ async function endSession(req, res) {
 
   try {
     const session = await DrivingSession.endSession(req.params.id, req.user.id);
+
+    // CLOSE THE LAPTOP WEBCAM FEED INSTANTLY
+    if (req.io) {
+      req.io.emit('SESSION_ENDED', { session_id: req.params.id });
+    }
+
     return res.json(session);
   } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
     console.error('endSession error:', err);
     return res.status(500).json({ error: err.message });
   }

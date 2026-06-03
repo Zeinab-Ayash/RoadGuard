@@ -58,12 +58,32 @@ export default function Notifications() {
       setLoading(false);
     }
   }, []);
+// Inside your Notifications() component function...
 
-  useEffect(() => {
-    if (authLoading) return;
-    fetchNotifications();
-  }, [authLoading, fetchNotifications]);
+useEffect(() => {
+  if (authLoading) return;
+  
+  // Initial manual fetch on load
+  fetchNotifications();
 
+  // Establish continuous polling check while focused
+  const intervalId = setInterval(async () => {
+    try {
+      const res = await api.get('/notifications');
+      
+      // If server list has more items than current local state array list,
+      // it means the camera daemon just fired a new alert!
+      if (res.data.length > notifications.length && notifications.length > 0) {
+        await playAlertSound(); // Trigger alarm chime sound immediately
+      }
+      setNotifications(res.data);
+    } catch (err) {
+      console.log("Background synchronization error:", err.message);
+    }
+  }, 3000);
+
+  return () => clearInterval(intervalId); // Clear loop when closing page view
+}, [authLoading, fetchNotifications, notifications.length]);
   const playAlertSound = async () => {
     try {
       const { sound } = await Audio.Sound.createAsync(

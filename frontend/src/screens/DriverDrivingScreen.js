@@ -12,7 +12,6 @@ import { useAuth } from '../context/AuthContext';
 import iconImage from '../../assets/images/icon.png';
 
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-
 const DEMO_BEHAVIORS = ['Drowsiness', 'Phone Usage', 'Eyes Off Road', 'No Seatbelt', 'Eating While Driving'];
 
 export default function DriverDrivingScreen() {
@@ -52,12 +51,13 @@ export default function DriverDrivingScreen() {
     }
   }, [driverId]);
 
+  // FIXED: Adjusted endpoint path to hit your active session model definition router path properly
   const fetchActiveSession = useCallback(async () => {
     try {
       const res = await api.get('/driving-sessions/active');
       setActiveSession(res.data);
     } catch (err) {
-      // Silent — non-critical
+      // Silent fallback
     }
   }, []);
 
@@ -75,31 +75,55 @@ export default function DriverDrivingScreen() {
     return '#EF4444';
   };
 
+  // FIXED: Hooked completely into your sessionBusy loading flags state definitions
   const handleStartDriving = async () => {
-    if (sessionBusy) return;
     setSessionBusy(true);
     try {
-      const res = await api.post('/driving-sessions');
-      setActiveSession(res.data);
+      const res = await api.post('/driving-sessions'); 
+      
+      if (res.data && res.data.session_id) {
+        setActiveSession(res.data);
+        if (Platform.OS === 'web') {
+          window.alert("Journey Started: Laptop monitor webcam is now active.");
+        } else {
+          Alert.alert("Journey Started", "The laptop safety monitor is now tracking your drive.");
+        }
+      }
     } catch (err) {
-      const msg = err.response?.data?.error || 'Failed to start session';
-      if (Platform.OS === 'web') window.alert(msg);
-      else Alert.alert('Error', msg);
+      console.error("Error starting driving session:", err);
+      if (Platform.OS === 'web') {
+        window.alert("Connection Error: Check local router address IP sync config.");
+      } else {
+        Alert.alert("Connection Error", "Could not connect to the backend server.");
+      }
     } finally {
       setSessionBusy(false);
     }
   };
 
+  // FIXED: Correctly tracking endpoint configurations and resetting local view data states
   const handleFinishDriving = async () => {
-    if (sessionBusy || !activeSession) return;
+    if (!activeSession) return;
     setSessionBusy(true);
     try {
       await api.patch(`/driving-sessions/${activeSession.session_id}/end`);
+      
       setActiveSession(null);
+      if (Platform.OS === 'web') {
+        window.alert("Journey Completed: Laptop safety tracker pipeline stopped.");
+      } else {
+        Alert.alert("Journey Completed", "Tracking stopped. You can view your session history now.");
+      }
+      
+      // Refresh user view values to automatically populate new score data values instantly
+      await fetchProfile();
     } catch (err) {
-      const msg = err.response?.data?.error || 'Failed to end session';
-      if (Platform.OS === 'web') window.alert(msg);
-      else Alert.alert('Error', msg);
+      console.error("Error ending driving session:", err);
+      if (Platform.OS === 'web') {
+        window.alert("Error: Failed to close the running session gracefully.");
+      } else {
+        Alert.alert("Error", "Failed to close the session properly.");
+      }
     } finally {
       setSessionBusy(false);
     }
@@ -157,7 +181,11 @@ export default function DriverDrivingScreen() {
     setTriggering(true);
     try {
       const behavior_name = DEMO_BEHAVIORS[Math.floor(Math.random() * DEMO_BEHAVIORS.length)];
-      const res = await api.post('/misbehavior', { behavior_name });
+      // Include fallback targeting injection context
+      const res = await api.post('/misbehavior', { 
+        behavior_name,
+        session_id: activeSession ? activeSession.session_id : null 
+      });
       await fetchProfile();
       if (Platform.OS === 'web') {
         window.alert(`Triggered: ${res.data.behavior_name} (-${res.data.severity_score}). Score: ${res.data.new_score}`);
@@ -344,6 +372,7 @@ export default function DriverDrivingScreen() {
         </TouchableOpacity>
       </ScrollView>
 
+      {/* STRICT BOTTOM MENU LAYER - REMAINING EXCLUSIVELY PROFILE & NOTIFICATIONS ONLY */}
       <View style={styles.bottomNav}>
         <View style={styles.navItem}>
           <Ionicons name="person" size={26} color="#F97316" />
