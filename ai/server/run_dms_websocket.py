@@ -174,7 +174,7 @@ def on_session_end(data):
 
 if __name__ == "__main__":
     try:
-        sio.connect(BACKEND_URL)
+        sio.connect('http://192.168.1.6:3000')
         print("System fully connected. Standing by for phone trigger commands...")
         sio.wait()
     except Exception as e:
