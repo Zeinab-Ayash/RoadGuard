@@ -6,19 +6,15 @@ function startOfCurrentMonthISO() {
   d.setHours(0, 0, 0, 0);
   return d.toISOString();
 }
-
 async function findCurrentMonthByDriver(driverId) {
+  // FIXED: Changed selection schema to read the direct 'behavior_name' column string you insert
   const { data, error } = await supabase
     .from('notification')
     .select(`
       notification_id,
       is_read,
       created_at,
-      misbehavior (
-        misbehavior_type (
-          behavior_name
-        )
-      )
+      behavior_name
     `)
     .eq('driver_id', driverId)
     .gte('created_at', startOfCurrentMonthISO())
@@ -26,11 +22,12 @@ async function findCurrentMonthByDriver(driverId) {
 
   if (error) throw error;
 
+  // Map the results cleanly so they match your exact React Native frontend expectation fields
   return data.map((n) => ({
     notification_id: n.notification_id,
     is_read: n.is_read,
     created_at: n.created_at,
-    behavior_name: n.misbehavior?.misbehavior_type?.behavior_name || 'Unknown',
+    behavior_name: n.behavior_name || 'Safety Alert', // Safe fallback string text
   }));
 }
 

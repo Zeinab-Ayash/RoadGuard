@@ -1,20 +1,22 @@
 const supabase = require('../utils/dbConnection');
 
 class DrivingSession {
-  // Find an active session for a specific driver
+  // 1. Find an active session for a specific driver (Fixed & Kept clean fallback sorting)
   static async getActive(driverId) {
     const { data, error } = await supabase
       .from('driving_session')
-      .select('*')
+      .select('*') // Keeps all columns intact so your controller doesn't break
       .eq('driver_id', driverId)
       .eq('is_active', true)
+      .order('start_time', { ascending: false }) // Fallback safety sorting
+      .limit(1)
       .maybeSingle();
     
     if (error) throw error;
-    return data;
+    return data || null;
   }
 
-  // Insert a new active session
+  // 2. Insert a new active session
   static async start(driverId) {
     const { data, error } = await supabase
       .from('driving_session')
@@ -30,7 +32,7 @@ class DrivingSession {
     return data;
   }
 
-  // End an active session
+  // 3. End an active session
   static async endSession(sessionId, driverId) {
     const { data, error } = await supabase
       .from('driving_session')
@@ -43,23 +45,9 @@ class DrivingSession {
     if (error) throw error;
     return data;
   }
-static async getActive(driverId) {
-  const { data } = await supabase
-    .from('driving_session')
-    .select('session_id, start_time')
-    .eq('driver_id', driverId)
-    .eq('is_active', true)
-    .order('start_time', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return data || null;
-}
 
-// Returns the most recently started active session, regardless of which driver.
-// Used by the AI server's browser publisher to auto-pair (it has no login
-// context, so it cannot query by driver_id). For the classroom demo where
-// only one driver is active at a time, this is unambiguous.
-static async getLatestAnyActive() {
+  // 4. Classroom Demo Unambiguous Auto-Pairing Fallback Link
+  static async getLatestAnyActive() {
     const { data, error } = await supabase
       .from('driving_session')
       .select('session_id')
@@ -72,5 +60,5 @@ static async getLatestAnyActive() {
     return data;
   }
 }
-module.exports = DrivingSession;
 
+module.exports = DrivingSession;
