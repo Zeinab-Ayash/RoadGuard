@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Image,
   ScrollView, TouchableOpacity,
-  SafeAreaView, Alert, ActivityIndicator, Platform
+  Alert, ActivityIndicator, Platform
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import api from '../services/api';
@@ -16,6 +17,7 @@ export default function DriverProfileScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const { user, role } = useAuth();
+  const insets = useSafeAreaInsets();
   const driverId = route.params?.driverId || (role === 'driver' ? user?.driver_id : null);
   const isViewingOwnProfile = role === 'driver' && !route.params?.driverId;
 
@@ -94,31 +96,34 @@ export default function DriverProfileScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, styles.centered]}>
+      <View style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color="#1E3A5F" />
         <Text style={{ marginTop: 10 }}>Loading driver profile...</Text>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (error || !data) {
     return (
-      <SafeAreaView style={[styles.container, styles.centered]}>
+      <View style={[styles.container, styles.centered]}>
         <Text style={styles.errorText}>{error || 'No data'}</Text>
         <TouchableOpacity style={styles.retryBtn} onPress={fetchProfile}>
           <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
-      </SafeAreaView>
+      </View>
     );
   }
 
   const { driver, history, monthlyScores } = data;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <View style={styles.container}>
+      <View style={[styles.header, { paddingTop: insets.top + 15 }]}>
         <Image source={iconImage} style={styles.headerIcon} />
         <Text style={styles.headerText}>RoadGuard</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -225,7 +230,7 @@ export default function DriverProfileScreen() {
         )}
       </ScrollView>
 
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -252,6 +257,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  backButton: { marginLeft: 'auto' },
+  backText: { color: '#fff', fontWeight: 'bold' },
 
   profileCard: { flexDirection: 'row', padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   avatar: { width: 85, height: 85, borderRadius: 45, backgroundColor: '#EEE' },

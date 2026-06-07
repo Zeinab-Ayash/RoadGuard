@@ -1,25 +1,49 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, Image,
   ScrollView, TouchableOpacity,
-  SafeAreaView, Alert, ActivityIndicator, Platform
+  Alert, ActivityIndicator, Platform,
+  DeviceEventEmitter,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import api from '../services/api';
+import { Audio } from 'expo-av';
+import api, { buildEventsWsUrl } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import iconImage from '../../assets/images/icon.png';
 
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-const DEMO_BEHAVIORS = ['Drowsiness', 'Phone Usage', 'Eyes Off Road', 'No Seatbelt', 'Eating While Driving'];
-
 export default function DriverDrivingScreen() {
   const navigation = useNavigation();
   const { user, logout } = useAuth();
   const driverId = user?.driver_id;
-  const [triggering, setTriggering] = useState(false);
+  const insets = useSafeAreaInsets();
+
+  // Ref to the currently-playing alarm sound so we can stop/unload it cleanly.
+  const soundRef = useRef(null);
+
+  // Play the 2-second alert.mp3 — same pattern as Notifications.js.
+  const playAlertSound = async () => {
+    try {
+      const { sound } = await Audio.Sound.createAsync(
+        require('../../assets/alert.mp3')
+      );
+      soundRef.current = sound;
+      await sound.playAsync();
+      setTimeout(async () => {
+        if (soundRef.current) {
+          await soundRef.current.stopAsync();
+          await soundRef.current.unloadAsync();
+          soundRef.current = null;
+        }
+      }, 2000);
+    } catch (err) {
+      console.log('Sound error:', err);
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -67,6 +91,53 @@ export default function DriverDrivingScreen() {
       fetchActiveSession();
     }, [fetchProfile, fetchActiveSession])
   );
+
+  // WebSocket lifecycle — opens when a driving session is active, closes when
+  // the session ends or this screen unmounts. Step 3 only LOGS events;
+  // alarm + POST handling lands in Step 4.
+  useEffect(() => {
+    if (!activeSession?.session_id) return;
+
+    const url = buildEventsWsUrl(activeSession.session_id);
+    console.log('[ws] opening', url);
+    const ws = new WebSocket(url);
+
+    ws.onopen    = () => console.log('[ws] connected');
+    ws.onerror   = (err) => console.warn('[ws] error', err);
+    ws.onclose   = () => console.log('[ws] closed');
+
+    // Real alarm handler — replaces Step 3's console.log.
+    ws.onmessage = async (event) => {
+      let behavior;
+      try {
+        const data = JSON.parse(event.data);
+        behavior = data.behavior;
+      } catch (err) {
+        console.warn('[ws] could not parse event:', event.data);
+        return;
+      }
+      if (!behavior) return;
+
+      // 1) Play the alarm sound IMMEDIATELY (no waiting on network).
+      playAlertSound();
+
+      // 2) In parallel, save the misbehavior to the backend. On success,
+      //    refetch the driver profile so the score / history / notification
+      //    badge update live.
+      try {
+        await api.post('/misbehavior', { behavior_name: behavior });
+        await fetchProfile();
+        // Tell any open Notifications screen to refresh.
+        DeviceEventEmitter.emit('roadguard:newMisbehavior');
+      } catch (err) {
+        console.warn('[ws] failed to record misbehavior:', err.message);
+      }
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [activeSession?.session_id]);
 
   const getScoreColor = (score) => {
     if (score >= 80) return '#22C55E';
@@ -152,55 +223,31 @@ export default function DriverDrivingScreen() {
     }
   };
 
-  const triggerDemoMisbehavior = async () => {
-    if (triggering) return;
-    setTriggering(true);
-    try {
-      const behavior_name = DEMO_BEHAVIORS[Math.floor(Math.random() * DEMO_BEHAVIORS.length)];
-      const res = await api.post('/misbehavior', { behavior_name });
-      await fetchProfile();
-      if (Platform.OS === 'web') {
-        window.alert(`Triggered: ${res.data.behavior_name} (-${res.data.severity_score}). Score: ${res.data.new_score}`);
-      } else {
-        Alert.alert('Misbehavior recorded', `${res.data.behavior_name} (-${res.data.severity_score})\nNew score: ${res.data.new_score}`);
-      }
-    } catch (err) {
-      const msg = err.response?.data?.error || 'Failed to trigger misbehavior';
-      if (Platform.OS === 'web') {
-        window.alert('Error: ' + msg);
-      } else {
-        Alert.alert('Error', msg);
-      }
-    } finally {
-      setTriggering(false);
-    }
-  };
-
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, styles.centered]}>
+      <View style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color="#1E3A5F" />
         <Text style={{ marginTop: 10 }}>Loading...</Text>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (error || !data) {
     return (
-      <SafeAreaView style={[styles.container, styles.centered]}>
+      <View style={[styles.container, styles.centered]}>
         <Text style={styles.errorText}>{error || 'No data'}</Text>
         <TouchableOpacity style={styles.retryBtn} onPress={fetchProfile}>
           <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
-      </SafeAreaView>
+      </View>
     );
   }
 
   const { driver, notificationsCount, history, monthlyScores } = data;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <View style={styles.container}>
+      <View style={[styles.header, { paddingTop: insets.top + 15 }]}>
         <Image source={iconImage} style={styles.headerIcon} />
         <Text style={styles.headerText}>RoadGuard</Text>
       </View>
@@ -257,15 +304,6 @@ export default function DriverDrivingScreen() {
                 ? 'Finish Driving'
                 : 'Start Driving'}
           </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.demoBtn, triggering && { opacity: 0.6 }]}
-          onPress={triggerDemoMisbehavior}
-          disabled={triggering}
-        >
-          <Ionicons name="alert-circle-outline" size={18} color="#2563eb" />
-          <Text style={styles.demoText}>{triggering ? 'Recording...' : 'Demo: Trigger Misbehavior'}</Text>
         </TouchableOpacity>
 
         <View style={styles.section}>
@@ -344,7 +382,7 @@ export default function DriverDrivingScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      <View style={styles.bottomNav}>
+      <View style={[styles.bottomNav, { paddingBottom: insets.bottom + 10 }]}>
         <View style={styles.navItem}>
           <Ionicons name="person" size={26} color="#F97316" />
           <Text style={[styles.navText, { color: '#F97316' }]}>Profile</Text>
@@ -364,7 +402,7 @@ export default function DriverDrivingScreen() {
           <Text style={styles.navText}>Notifications</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -407,12 +445,9 @@ const styles = StyleSheet.create({
   scoreLabel: { fontSize: 12, color: '#9CA3AF' },
   scoreValue: { fontSize: 28, fontWeight: 'bold' },
 
-  startBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#16a34a', marginHorizontal: 20, marginTop: 20, padding: 15, borderRadius: 12, gap: 8 },
-  finishBtn: { backgroundColor: '#dc2626' },
+  startBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#2563eb', marginHorizontal: 20, marginTop: 20, padding: 15, borderRadius: 12, gap: 8 },
+  finishBtn: { backgroundColor: '#F97316' },
   startText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
-
-  demoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'white', borderWidth: 1, borderColor: '#2563eb', marginHorizontal: 20, marginTop: 10, padding: 10, borderRadius: 8, gap: 6 },
-  demoText: { color: '#2563eb', fontWeight: '600', fontSize: 13 },
 
   logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F97316', marginHorizontal: 20, marginTop: 10, marginBottom: 20, padding: 15, borderRadius: 12, gap: 8 },
   logoutText: { color: 'white', fontWeight: 'bold', fontSize: 16 },

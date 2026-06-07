@@ -43,7 +43,7 @@ from detectors import (
 FACE_MODEL_PATH = "models/face_landmarker.task"
 HAND_MODEL_PATH = "models/hand_landmarker.task"
 COCO_MODEL_PATH = "yolov8s.pt"
-SEATBELT_MODEL_PATH = "models/seatbelt_v2.pt"
+SEATBELT_MODEL_PATH = "models/seatbelt_v3.pt"
 
 
 class FrameAnalyzer:

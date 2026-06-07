@@ -40,7 +40,7 @@ For **EAR (Eye Aspect Ratio)** — drowsiness detection:
 - **Right eye**: 33 (outer corner), 133 (inner corner), 159 (top), 145 (bottom)
 - **Left eye**: 263 (outer corner), 362 (inner corner), 386 (top), 374 (bottom)
 - EAR formula per eye: `(|p2 - p6| + |p3 - p5|) / (2 * |p1 - p4|)`
-- Drowsy when EAR < 0.20 (per CLAUDE.md threshold)
+- Drowsy when EAR < 0.20 (per project spec threshold)
 
 For **mouth** — eating / chewing motion:
 - **Top lip center**: 13
@@ -116,23 +116,23 @@ for box in boxes:
 | 55 | `cake` | Eating signal |
 | 67 | `cell phone` | Phone usage detection |
 
-### Thresholds per CLAUDE.md
+### Thresholds per project spec
 
 - Phone usage: `cell phone` with `conf ≥ 0.7`
 - Eating: any food class above + hand-near-mouth (MediaPipe signal)
 
 ---
 
-## 3. Custom Seatbelt Model — `seatbelt_v2.pt`
+## 3. Custom Seatbelt Model — `seatbelt_v3.pt`
 
-Trained on patok-tok-patok/seatbelt-cuunt v2 (~4700 in-cabin driver images), 50 epochs on Tesla T4.
+Trained on patok-tok-patok/seatbelt-cuunt v2 (4,696 in-cabin driver images, re-split 80/10/10 with seed=42), 50 epochs on Tesla T4.
 
-**Performance:** mAP50 = 0.888 (seatbelt class 0.962, no-seatbelt class 0.814).
+**Performance on held-out test set (471 images):** mAP50 = 0.9522, mAP50-95 = 0.7051 (seatbelt class 0.985, no-seatbelt class 0.919).
 
 ### Load
 
 ```python
-seatbelt_model = YOLO("models/seatbelt_v2.pt")
+seatbelt_model = YOLO("models/seatbelt_v3.pt")
 ```
 
 ### Inference (same API as COCO YOLO)
@@ -152,7 +152,7 @@ for box in results[0].boxes:
 | 0 | `no-seatbelt` |
 | 1 | `seatbelt` |
 
-### Threshold (per CLAUDE.md)
+### Threshold (per project spec)
 
 - No seatbelt detection: class 0 (`no-seatbelt`) returned with `conf ≥ 0.6`
 - Duration threshold: ≥ 3 seconds (in BehaviorTracker)
@@ -180,7 +180,7 @@ In `analyze_frame(image)` (Phase 3.6):
 1. Run **MediaPipe Face Landmarker** → get 478 landmarks
 2. Run **YOLOv8s COCO** on color frame → get `boxes` for phone/food/person
 3. Convert frame to grayscale-3-channel, run **seatbelt model** → get seatbelt/no-seatbelt
-4. Compute per-behavior signals using thresholds from CLAUDE.md:
+4. Compute per-behavior signals using thresholds from project spec:
    - Drowsiness: EAR < 0.20
    - Eyes off road: head yaw or pitch > 30°
    - Phone usage: COCO `cell phone` with conf ≥ 0.7

@@ -17,6 +17,7 @@ import iconImage from '../../assets/images/icon.png';
 import InitialsAvatar from '../components/InitialsAvatar';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const getScoreColor = (score) => {
   if (score >= 80) return '#16a34a';
@@ -59,6 +60,7 @@ const DriverCard = ({ driver, onPress }) => {
 
 export default function DriversList({ navigation }) {
   const { loading: authLoading } = useAuth();
+  const insets = useSafeAreaInsets();
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -109,7 +111,7 @@ export default function DriversList({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 15 }]}>
         <Image source={iconImage} style={styles.headerIcon} />
         <Text style={styles.headerText}>RoadGuard</Text>
       </View>
@@ -195,7 +197,7 @@ export default function DriversList({ navigation }) {
         />
       )}
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 10 }]}>
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => navigation.navigate('Dashboard')}

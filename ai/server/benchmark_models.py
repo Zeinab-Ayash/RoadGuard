@@ -71,7 +71,7 @@ hand_landmarker = mp.tasks.vision.HandLandmarker.create_from_options(hand_opts)
 print("Loading YOLO models...")
 yolo_coco_s = YOLO("yolov8s.pt")
 yolo_coco_n = YOLO("yolov8n.pt")
-seatbelt_s = YOLO("models/seatbelt_v2.pt")
+seatbelt_s = YOLO("models/seatbelt_v3.pt")
 print()
 
 

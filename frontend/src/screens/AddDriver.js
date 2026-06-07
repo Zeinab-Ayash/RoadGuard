@@ -12,7 +12,7 @@ import {
   ScrollView,
   Alert,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import api from "../services/api";
@@ -20,7 +20,7 @@ import api from "../services/api";
 const { height: screenHeight } = Dimensions.get("window");
 
 export default function AddDriverScreen({ navigation, onBack }) {
-  
+  const insets = useSafeAreaInsets();
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -114,13 +114,11 @@ const handleAddDriver = async () => {
 
   return (
     <View style={styles.outerContainer}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-
       <View style={styles.mobileWrapper}>
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={styles.safeArea} edges={['bottom']}>
 
           {/* HEADER */}
-          <View style={styles.header}>
+          <View style={[styles.header, { paddingTop: insets.top + 15 }]}>
             <Image
               source={require("../../assets/images/icon.png")}
               style={styles.headerIcon}
@@ -191,13 +189,12 @@ const handleAddDriver = async () => {
 
                   <View style={styles.credentialRow}>
                     <Text style={styles.label}>Driver code</Text>
-                     <Text style={styles.value}>{generatedDriverCode}</Text>
+                    <Text selectable style={styles.value}>{generatedDriverCode}</Text>
                   </View>
 
                   <View style={styles.credentialRow}>
                     <Text style={styles.label}>Password</Text>
-                    <Text style={styles.value}>{generatedPassword} </Text>
-                                     
+                    <Text selectable style={styles.value}>{generatedPassword}</Text>
                   </View>
 
                   <Text style={styles.note}>
@@ -243,7 +240,6 @@ const styles = StyleSheet.create({
 
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
 
   header: {

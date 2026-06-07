@@ -291,30 +291,13 @@
         }
       };
 
-      // TEMP: also subscribe to /events so we can beep on alarms while testing.
-      // In production this listener is the PHONE, not the browser publisher.
-      const eventsUrl = `${WS_PROTOCOL}://${AI_HOST}/events/${sessionId}`;
-      eventsWs = new WebSocket(eventsUrl);
-      eventsWs.onmessage = (ev) => {
-        try {
-          const data = JSON.parse(ev.data);
-          lastAlarm = data.behavior || "?";
-          $overlay.textContent = "🚨 " + lastAlarm;
-          beep();
-          // restore overlay text after a couple of seconds
-          setTimeout(() => {
-            if (currentSessionId)
-              $overlay.textContent = "session " + currentSessionId.slice(0,8);
-          }, 2500);
-        } catch (e) { console.warn("events parse error", e); }
-      };
-      eventsWs.onerror = (e) => console.warn("events ws error", e);
+      // Production: the PHONE is the events listener, not the browser publisher.
+      // The browser only uploads frames; alarms fire on the phone via /events.
     }
 
     function stopPublishing() {
       if (captureTimer) { clearInterval(captureTimer); captureTimer = null; }
       if (ws) { ws.close(); ws = null; }
-      if (eventsWs) { eventsWs.close(); eventsWs = null; }   // close TEMP events listener too
       currentSessionId = null;
       $session.textContent = "—";
       $overlay.textContent = "no session";

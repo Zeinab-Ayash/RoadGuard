@@ -5,9 +5,24 @@ node_modules/
 .DS_Store
 *.log
 npm-debug.log*
+structure.txt
 
 # Python
 __pycache__/
 *.pyc
 venv/
 .vscode/
+
+# Training run artifacts — exclude duplicate weights + large sample images
+# Production weights live in ai/server/models/ — no need to duplicate them in training_runs/
+ai/server/training_runs/**/weights/
+ai/server/training_runs/**/train_batch*.jpg
+ai/server/training_runs/**/val_batch*.jpg
+
+# Dataset files — regeneratable from build_dataset.py + Roboflow source URL
+# Scripts (build_dataset.py, data.yaml, split_manifest.csv) are kept for reproducibility
+ai/server/combined_dataset/raw/
+ai/server/combined_dataset/train/
+ai/server/combined_dataset/valid/
+ai/server/combined_dataset/test/
+ai/server/combined_dataset.zip

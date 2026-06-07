@@ -6,7 +6,7 @@ driver images, classes: ['no-seatbelt', 'seatbelt']). Final results: mAP50=0.888
 (seatbelt class: 0.962, no-seatbelt class: 0.814).
 
 This script is the local fallback. CPU training on the 4700-image dataset takes
-~10+ hours, so Colab is strongly preferred. See Colab steps in CLAUDE.md.
+~10+ hours, so Colab is strongly preferred. See Colab steps in the project documentation.
 """
 
 from ultralytics import YOLO

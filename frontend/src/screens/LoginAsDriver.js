@@ -11,7 +11,7 @@ import {
   Platform,
   ScrollView,
   } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import api from "../services/api";
@@ -22,6 +22,7 @@ const { height: screenHeight } = Dimensions.get("window");
 export default function LoginScreen() {
   const navigation = useNavigation();
   const { login } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const [driverId, setDriverId] = useState("");
   const [password, setPassword] = useState("");
@@ -76,13 +77,11 @@ const handleLogin = async () => {
 
   return (
     <View style={styles.outerContainer}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-
       <View style={styles.mobileWrapper}>
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={styles.safeArea} edges={['bottom']}>
 
           {/* HEADER */}
-          <View style={styles.header}>
+          <View style={[styles.header, { paddingTop: insets.top + 15 }]}>
             <Image
               source={require("../../assets/images/icon.png")}
               style={styles.headerIcon}
@@ -183,7 +182,6 @@ const styles = StyleSheet.create({
 
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
 
   header: {

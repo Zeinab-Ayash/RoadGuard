@@ -30,7 +30,7 @@ import math
 # partially hidden by glare or head turn).
 # ============================================================
 
-# Threshold per CLAUDE.md
+# Threshold per project spec
 EAR_THRESHOLD = 0.20
 
 # MediaPipe Face Mesh landmark indices for EAR.
@@ -112,7 +112,7 @@ def detect_drowsiness(face_landmarks, face_blendshapes=None):
 #   pitch — rotation around X-axis (head tilting up/down)
 #   roll  — rotation around Z-axis (head tilting sideways toward shoulder)
 #
-# Per CLAUDE.md: looking away if |yaw| > 30° OR |pitch| > 30°.
+# Per project spec: looking away if |yaw| > 30° OR |pitch| > 30°.
 # (We treat strong head-down as "eyes off road" — looking at lap/phone.)
 # ============================================================
 
@@ -175,7 +175,7 @@ def detect_looking_away(transform_matrix):
 # PHONE USAGE (3.4)
 # ============================================================
 # Uses YOLOv8s COCO output. COCO class 67 = "cell phone".
-# Per CLAUDE.md: confidence threshold ≥ 0.7
+# Per project spec: confidence threshold ≥ 0.7
 # ============================================================
 
 PHONE_CONFIDENCE_THRESHOLD = 0.6
@@ -214,9 +214,9 @@ def detect_phone(yolo_results):
 # ============================================================
 # NO SEATBELT (3.5)
 # ============================================================
-# Uses our custom-trained YOLOv8s seatbelt model (seatbelt_v2.pt).
+# Uses our custom-trained YOLOv8s seatbelt model (seatbelt_v3.pt).
 # Classes: 0 = no-seatbelt, 1 = seatbelt
-# Per CLAUDE.md: confidence threshold ≥ 0.6 for class 0
+# Per project spec: confidence threshold ≥ 0.6 for class 0
 #
 # Trained on a mix of color + grayscale in-cabin images. In testing
 # we found the model can over-confidently false-fire on out-of-
@@ -233,7 +233,7 @@ NO_SEATBELT_CONF_THRESHOLD = 0.6
 def detect_no_seatbelt(seatbelt_yolo_results):
     """Return (is_no_seatbelt, best_conf) for the current frame.
 
-    seatbelt_yolo_results: Results object from seatbelt_v2.pt inference
+    seatbelt_yolo_results: Results object from seatbelt_v3.pt inference
                             (results[0] of seatbelt_model(image))
 
     Strategy:
@@ -277,7 +277,7 @@ def convert_to_grayscale_3ch(image_bgr):
 #   2. MediaPipe Hand Landmarker  — gives fingertip positions
 #   3. YOLOv8s COCO               — detects food objects in scene
 #
-# Per CLAUDE.md: eating = hand within ~50 px of mouth AND food object detected.
+# Per project spec: eating = hand within ~50 px of mouth AND food object detected.
 #
 # Coordinate systems are NORMALIZED (0..1 of image dimensions) from both
 # MediaPipe outputs, so distances are also in normalized units. We use

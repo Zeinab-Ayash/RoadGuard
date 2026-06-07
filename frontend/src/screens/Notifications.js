@@ -9,12 +9,14 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  DeviceEventEmitter,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import iconImage from '../../assets/images/icon.png';
 import api from '../services/api';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 
 function formatNotificationTime(isoString) {
@@ -35,6 +37,7 @@ function formatNotificationTime(isoString) {
 export default function Notifications() {
   const navigation = useNavigation();
   const route = useRoute();
+  const insets = useSafeAreaInsets();
   const fromScreen = route.params?.from || "DriverDriving";
 
   const { loading: authLoading } = useAuth();
@@ -63,6 +66,16 @@ export default function Notifications() {
     if (authLoading) return;
     fetchNotifications();
   }, [authLoading, fetchNotifications]);
+
+  // Listen for live misbehavior events fired by DriverDrivingScreen's WebSocket.
+  // When a new misbehavior is recorded, refresh the list automatically.
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(
+      'roadguard:newMisbehavior',
+      () => { fetchNotifications(); }
+    );
+    return () => sub.remove();
+  }, [fetchNotifications]);
 
   const playAlertSound = async () => {
     try {
@@ -105,18 +118,6 @@ export default function Notifications() {
     }
   };
 
-  const triggerDemoAlert = async () => {
-    const demoNotif = {
-      notification_id: 'demo-' + Math.random().toString(36).slice(2, 10),
-      is_read: false,
-      created_at: new Date().toISOString(),
-      behavior_name: 'Drowsiness',
-      isDemo: true,
-    };
-    setNotifications((prev) => [demoNotif, ...prev]);
-    await playAlertSound();
-  };
-
   const renderItem = ({ item }) => (
     <View style={styles.item}>
       <View style={styles.left}>
@@ -139,14 +140,10 @@ export default function Notifications() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 15 }]}>
         <Image source={iconImage} style={styles.headerIcon} />
         <Text style={styles.headerText}>RoadGuard</Text>
       </View>
-
-      <TouchableOpacity style={styles.simBtn} onPress={triggerDemoAlert}>
-        <Text style={styles.simText}>Demo: Trigger Alert</Text>
-      </TouchableOpacity>
 
       {loading ? (
         <View style={styles.centeredMsg}>
@@ -172,7 +169,7 @@ export default function Notifications() {
         />
       )}
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 10 }]}>
         <TouchableOpacity
   style={styles.navItem}
   onPress={() => navigation.navigate(fromScreen)}
@@ -209,17 +206,6 @@ const styles = StyleSheet.create({
   headerText: {
     color: 'white',
     fontSize: 18,
-    fontWeight: 'bold',
-  },
-  simBtn: {
-    backgroundColor: '#2563eb',
-    margin: 10,
-    padding: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  simText: {
-    color: 'white',
     fontWeight: 'bold',
   },
   item: {
@@ -305,6 +291,8 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingHorizontal: 10,
     paddingBottom: Platform.OS === 'ios' ? 30 : 20,
+    borderTopWidth: 1,
+    borderTopColor: '#EEE',
   },
   navItem: {
     alignItems: 'center',

@@ -11,7 +11,7 @@ import {
   Dimensions,
   Alert,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
@@ -23,6 +23,7 @@ const { height: screenHeight } = Dimensions.get("window");
 export default function App() {
   const navigation = useNavigation();
   const { login } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
@@ -156,12 +157,10 @@ const handleSignUp = async () => {
   return (
     <View style={styles.container}>
       <View style={styles.phoneFrame}>
-        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={styles.safeArea} edges={['bottom']}>
 
           {/* HEADER */}
-          <View style={styles.header}>
+          <View style={[styles.header, { paddingTop: insets.top + 15 }]}>
             <Image
               source={require("../../assets/images/icon.png")}
               style={styles.headerIcon}
@@ -295,7 +294,6 @@ const styles = StyleSheet.create({
 
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
 
   header: {

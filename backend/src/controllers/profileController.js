@@ -158,11 +158,21 @@ const getDriverProfile = async (req, res) => {
         monthlyHistory,
       },
 
-      monthlyScores:
-        monthlyScores?.map((m) => ({
+      monthlyScores: (() => {
+        const scores = (monthlyScores || []).map((m) => ({
           month: m.month,
           score: m.score,
-        })) || [],
+        }));
+        // If no row exists for the current month yet (e.g. driver was created
+        // mid-month, before pg_cron runs), synthesize one from current_score
+        // so the UI always shows the live score.
+        const currentMonth = now.getMonth() + 1;
+        if (!scores.some((m) => m.month === currentMonth)) {
+          scores.push({ month: currentMonth, score: driver.current_score });
+          scores.sort((a, b) => a.month - b.month);
+        }
+        return scores;
+      })(),
     });
   } catch (err) {
     console.error(err);

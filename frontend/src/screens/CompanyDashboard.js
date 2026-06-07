@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Ionicons } from '@expo/vector-icons';
 import iconImage from '../../assets/images/icon.png';
@@ -37,6 +38,7 @@ const DriverCard = ({ driver, onPress }) => {
 
 export default function CompanyDashboard({ navigation }) {
   const { user, loading: authLoading, logout, updateUser } = useAuth();
+  const insets = useSafeAreaInsets();
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -133,7 +135,7 @@ export default function CompanyDashboard({ navigation }) {
   return (
     <View style={styles.container}>
 
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 15 }]}>
         <Image source={iconImage} style={styles.headerIcon} />
         <Text style={styles.headerText}>RoadGuard</Text>
       </View>
@@ -196,7 +198,7 @@ export default function CompanyDashboard({ navigation }) {
         />
       )}
 
-      <View style={styles.bottomNav}>
+      <View style={[styles.bottomNav, { paddingBottom: insets.bottom + 10 }]}>
         <TouchableOpacity style={styles.navItem} onPress={handleDashboardPress}>
           <Ionicons name="home" size={20} color="#f97316" />
           <Text style={styles.activeTab}>Dashboard</Text>

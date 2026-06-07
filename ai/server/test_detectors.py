@@ -40,8 +40,8 @@ print("Loading YOLOv8s...")
 yolo_model = YOLO("yolov8s.pt")
 
 # Custom seatbelt model
-print("Loading seatbelt_v2.pt...")
-seatbelt_model = YOLO("models/seatbelt_v2.pt")
+print("Loading seatbelt_v3.pt...")
+seatbelt_model = YOLO("models/seatbelt_v3.pt")
 print()
 
 # Ground truth — separate flag per behavior
