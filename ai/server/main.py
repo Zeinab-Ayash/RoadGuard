@@ -33,6 +33,7 @@ import logging
 import time
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -49,6 +50,18 @@ log = logging.getLogger("roadguard.server")
 
 # ─── app ──────────────────────────────────────────────────────────────
 app = FastAPI(title="RoadGuard AI Server")
+
+# Allow connections from any origin so the deployed mobile app and the
+# browser publisher can reach the server regardless of where they are
+# hosted. For a production tightening pass, replace ["*"] with the exact
+# list of allowed origins.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ─── HTTP routes ──────────────────────────────────────────────────────
