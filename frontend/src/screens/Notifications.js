@@ -20,7 +20,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 
 function formatNotificationTime(isoString) {
-  const date = new Date(isoString);
+  // Force UTC parsing if the timestamp doesn't already include a timezone marker.
+  const utcString = isoString.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(isoString)
+    ? isoString
+    : isoString + 'Z';
+  const date = new Date(utcString);
   const now = new Date();
   const isToday =
     date.getFullYear() === now.getFullYear() &&
