@@ -166,6 +166,9 @@ const handleSignUp = async () => {
               style={styles.headerIcon}
             />
             <Text style={styles.headerText}>RoadGuard</Text>
+            <TouchableOpacity onPress={() => navigation.navigate("LoginAsCompany")} style={styles.backButton}>
+              <Text style={styles.backText}>Back</Text>
+            </TouchableOpacity>
           </View>
 
           {/* IMAGE */}
@@ -305,6 +308,8 @@ const styles = StyleSheet.create({
 
   headerIcon: { width: 30, height: 30, marginRight: 10 },
   headerText: { color: "white", fontSize: 18, fontWeight: "bold" },
+  backButton: { marginLeft: "auto" },
+  backText: { color: "#fff", fontWeight: "bold" },
 
   imageContainer: {
     height: screenHeight * 0.30,
