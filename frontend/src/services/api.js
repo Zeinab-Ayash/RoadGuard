@@ -1,17 +1,13 @@
 import axios from 'axios';
 
-// Backend API base URL.
-// - Web / iOS Simulator:  http://localhost:3000
-// - Android Emulator:     http://10.0.2.2:3000
-// - Phone via Expo Go:    http://YOUR_LAPTOP_LAN_IP:3000  (e.g. http://192.168.10.177:3000)
-export const API_BASE_URL = 'http://192.168.10.177:3000';
+// URLs are read from Expo public env vars (loaded automatically from .env / .env.local).
+// Fallbacks are the deployed production URLs, so an `eas build` works even if .env is missing.
+// For local dev, create frontend/.env.local with your laptop LAN IP (see .env.local.example).
+export const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL || 'https://roadguard-f0x4.onrender.com';
 
-// AI server WebSocket base URL (Phase 5 server). The phone connects to
-// /events/{session_id} on this host to receive behavior alarms.
-// - Local laptop testing:    ws://<your-laptop-LAN-IP>:8000
-// - Hugging Face Spaces:     wss://<user>-<space-name>.hf.space
-//                            (note: wss:// because HF serves over HTTPS)
-export const AI_SERVER_WS_BASE = 'ws://192.168.10.177:8000';
+export const AI_SERVER_WS_BASE =
+  process.env.EXPO_PUBLIC_AI_SERVER_WS_BASE || 'wss://Zeinab-Ayash-roadguard-ai-server.hf.space';
 
 // Helper to build the events WebSocket URL for a given session id.
 export function buildEventsWsUrl(sessionId) {
