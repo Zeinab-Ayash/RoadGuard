@@ -1,0 +1,11 @@
+path: C:/Users/Admin/Desktop/uni courses/M1 sem2/M1 Project/RoadGuard/ai/server/combined_dataset
+train: train/images
+val: valid/images
+test: test/images
+
+nc: 2
+names: ['no-seatbelt', 'seatbelt']
+
+# Dataset: patok-tok-patok/seatbelt-cuunt v2 (4,696 images, 50/50 class balance)
+# Re-split 80/10/10 train/valid/test for held-out test evaluation.
+# Random seed: 42
